@@ -1,0 +1,37 @@
+A DIMO-powered Mileage Calculator web app would automate and simplify monthly mileage reporting for reimbursements, leveraging always-on R1 data and offering tangible user rewards—outperforming manual workflows and popular apps like MileIQ and Stride.[1][2][3]
+
+### Key Features
+- **Automatic, Background Mileage Capture:** Utilizes vehicle-connected R1 data for precision—no need to tap start/stop or rely on phone sensors. Trips are auto-logged whenever the vehicle is in motion, no manual effort required.[4]
+- **Daily/Monthly Breakdown & CSV Export:** Users can generate a clean, IRS-compliant CSV for any date range, showing miles driven per day and optionally tagging drives as business, personal, or custom purposes.[5][1]
+- **Simple Trip Review & Bulk Classification:** In-browser, users can quickly review, edit, and classify trips in bulk (e.g., all weekday trips as “Business”). Add notes or purposes as needed for extra context.[6]
+- **Automated Reminders & Calendar Sync:** Sends monthly or weekly prompts to review and export logs. Syncs mileage periods with Google Calendar or popular work scheduling services like WhenIWork.[7]
+- **Direct Integration & Rewards:** BD targets: easy API or file sync for QuickBooks (reimbursements), payroll, or gig-economy portals. Driving for work also earns additional DIMO rewards—offering higher value than passive logging alone.[3]
+- **Privacy & Security:** Users can remove or redact personal trips before export and control exactly what data is shared or integrated with employer systems.[8][1]
+
+### Pitch to Consumers and Partners
+- **"You work. We track. You earn—automatically.”** More accurate than manual logs, more seamless than MileIQ or Stride, and with DIMO rewards on top.
+- **Ideal for:** W-2 employees, freelancers, gig workers, rideshare/delivery drivers, and anyone who misses out on reimbursements due to reporting hassle.
+- **Partnership/Channel Play:** Offer direct CSV/API connections to Quickbooks, WhenIWork, HR/payroll systems, or partner with channel apps like MileIQ and Stride to power their backend with DIMO’s device-verified data.[2][1]
+
+This project maximizes user and business value with minimal friction, perfectly fits rapid hackathon execution, and showcases DIMO’s power to automate a high-pain, high-frequency user task.[1][2][3]
+
+[1](https://www.mileagewise.com/mileiq-alternative/mileiq-review/)
+[2](https://www.mileagewise.com/stride-review/)
+[3](https://dimo.co/pages/rewards)
+[4](https://mileiq.com/blog/the-ultimate-mileage-tracker-guide)
+[5](https://apps.apple.com/us/app/mileiq-mileage-tracker-log/id578830929)
+[6](https://support.mileiq.com/hc/en-us/articles/218138823-What-can-I-do-with-MileIQ)
+[7](https://mileiq.com/whats-new-at-mileiq)
+[8](https://www.mileagewise.com/dictionary/stride/)
+[9](https://mileiq.com)
+[10](https://mileiq.com/blog/mileiq-intelligence-features)
+[11](https://timeero.com/reviews/mileiq-review)
+[12](https://www.prweb.com/releases/marble-partners-with-dimo-to-unlock-lower-insurance-rates-for-customers-301974256.html)
+[13](https://timeero.com/reviews/stride-review)
+[14](https://support.dimo.co/en-US/what-is-dimo-2039638)
+[15](https://mileiq.com/blog/your-favorite-mileage-tracking-app)
+[16](https://apps.apple.com/us/app/stride-mileage-tax-tracker/id1041591359)
+[17](https://www.youtube.com/watch?v=3G_5YkMT-EA)
+[18](https://www.youtube.com/watch?v=ojj_esdSi-w)
+[19](https://support.stridehealth.com/hc/en-us/articles/115007683567-Can-my-Stride-app-automatically-start-tracking-my-mileage-when-I-start-moving)
+[20](https://www.reddit.com/r/dimo_network/comments/1h5mrmt/hello/)
