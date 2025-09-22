@@ -5,8 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DimoAuthProvider, initializeDimoSDK } from "@dimo-network/login-with-dimo";
 import { ThemeProvider } from "@/components/theme-provider";
+import AppNavigation from "@/components/navigation";
 import NotFound from "@/pages/not-found";
 import GpsVisualizer from "@/pages/gps-visualizer";
+import SharedVehicles from "@/pages/shared-vehicles";
 
 // Initialize DIMO SDK
 initializeDimoSDK({
@@ -19,6 +21,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={GpsVisualizer} />
+      <Route path="/shared-vehicles" component={SharedVehicles} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -30,6 +33,7 @@ function App() {
       <DimoAuthProvider>
         <ThemeProvider>
           <TooltipProvider>
+            <AppNavigation />
             <Toaster />
             <Router />
           </TooltipProvider>
