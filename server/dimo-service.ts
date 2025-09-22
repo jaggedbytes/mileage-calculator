@@ -237,9 +237,8 @@ export class DimoService {
         query: query,
       });
 
-console.log(`DIMO Detailed History API returned ${signalsData?.length || 0} data points`);
-
       const signalsData = historyData?.data?.signals;
+      console.log(`DIMO Detailed History API returned ${signalsData?.length || 0} data points`);
 
       if (!Array.isArray(signalsData) || signalsData.length === 0) {
         return [];
