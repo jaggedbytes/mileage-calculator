@@ -63,8 +63,8 @@ app.use((req, res, next) => {
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host: process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost",
+    reusePort: process.env.NODE_ENV === "production",
   }, () => {
     log(`serving on port ${port}`);
   });
