@@ -1,5 +1,5 @@
 import { DIMO } from "@dimo-network/data-sdk";
-import { detectTrips, calculateDistance } from "./utils";
+import { detectTrips } from "./utils";
 import { type InsertTrip } from "@shared/schema";
 
 // DIMO data service using official SDK
@@ -237,7 +237,7 @@ export class DimoService {
         query: query,
       });
 
-      console.log("DIMO Detailed History API response:", historyData);
+console.log(`DIMO Detailed History API returned ${signalsData?.length || 0} data points`);
 
       const signalsData = historyData?.data?.signals;
 
@@ -245,13 +245,13 @@ export class DimoService {
         return [];
       }
 
-      // Convert to standardized format
+      // Convert to standardized format with explicit parsing
       return signalsData
-        .filter(point => point.currentLocationLatitude && point.currentLocationLongitude)
+        .filter(point => point.currentLocationLatitude && point.currentLocationLongitude && point.timestamp)
         .map(point => ({
-          lat: point.currentLocationLatitude,
-          lng: point.currentLocationLongitude,
-          hdop: point.dimoAftermarketHDOP || 1.0,
+          lat: parseFloat(point.currentLocationLatitude),
+          lng: parseFloat(point.currentLocationLongitude),
+          hdop: point.dimoAftermarketHDOP ? parseFloat(point.dimoAftermarketHDOP) : 1.0,
           timestamp: point.timestamp
         }));
 
