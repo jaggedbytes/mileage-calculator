@@ -6,24 +6,44 @@ import {
 import { Button } from "@/components/ui/button";
 import { User, LogOut, Car } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
+import { useEffect } from "react";
 
 export default function DimoAuth() {
   const { isAuthenticated, email, walletAddress, isFromCache } =
     useCachedDimoAuth();
   const dimoSdkState = useDimoAuthState();
 
-  // Debug: Log raw DIMO SDK state
-  console.log("DimoAuth - Raw DIMO SDK state:", dimoSdkState);
+  // Handle authentication state changes after redirect
+  useEffect(() => {
+    if (dimoSdkState?.isAuthenticated && dimoSdkState?.walletAddress) {
+      // Cache wallet address
+      localStorage.setItem("dimo_cached_wallet_address", dimoSdkState.walletAddress);
+      
+      // Cache email if available
+      if (dimoSdkState.email) {
+        localStorage.setItem("dimo_cached_email", dimoSdkState.email);
+      }
+      
+      // Try to get and cache the JWT
+      if (dimoSdkState.getValidJWT) {
+        try {
+          const jwt = dimoSdkState.getValidJWT();
+          if (jwt) {
+            localStorage.setItem("dimo_cached_token", jwt);
+          }
+        } catch (error) {
+          console.log("Could not get JWT from DIMO SDK state:", error);
+        }
+      }
+      
+      // Force re-render
+      window.dispatchEvent(new Event("storage"));
+    }
+  }, [dimoSdkState?.isAuthenticated, dimoSdkState?.walletAddress, dimoSdkState?.email]);
 
   const handleShareSuccess = (authData: any) => {
-    console.log("DIMO vehicle sharing successful:", authData);
-
     // Cache wallet address and token directly from authData
     if (authData?.walletAddress) {
-      console.log(
-        "Caching wallet address from authData:",
-        authData.walletAddress,
-      );
       localStorage.setItem(
         "dimo_cached_wallet_address",
         authData.walletAddress,
@@ -31,16 +51,11 @@ export default function DimoAuth() {
     }
 
     if (authData?.token) {
-      console.log("Caching token from authData");
       localStorage.setItem("dimo_cached_token", authData.token);
     }
 
     // Force re-render by triggering a storage event
     window.dispatchEvent(new Event("storage"));
-
-    console.log("Shared vehicles:", authData?.sharedVehicles || "none");
-    // In redirect mode, the redirect happens automatically
-    // This callback is for handling the returned data
   };
 
   const handleShareError = (error: any) => {

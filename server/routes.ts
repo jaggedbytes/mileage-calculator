@@ -7,6 +7,22 @@ import { dimoService } from "./dimo-service";
 import { generateMileageSummary } from "./utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Authentication callback routes
+  app.get("/auth/callback", (req, res) => {
+    // This route handles the OAuth callback from DIMO
+    // The actual authentication is handled by the DIMO SDK on the client side
+    // This route just redirects back to the main app
+    const { logout } = req.query;
+    
+    if (logout === "true") {
+      // Handle logout - redirect to home page
+      res.redirect("/");
+    } else {
+      // Handle successful authentication - redirect to home page
+      res.redirect("/");
+    }
+  });
+
   // GPS data routes
   app.post("/api/gps", async (req, res) => {
     try {

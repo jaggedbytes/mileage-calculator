@@ -44,21 +44,17 @@ interface SharedVehiclesResponse {
   count: number;
 }
 
-function getCookieValue(cookieName: string): string | null {
-  const cookies = document.cookie.split("; ");
-  for (let cookie of cookies) {
-    const [name, value] = cookie.split("=");
-    if (name === cookieName) {
-      return decodeURIComponent(value);
-    }
+function getCachedToken(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem("dimo_cached_token");
   }
-  return null; // Return null if the cookie is not found
+  return null;
 }
 
 const fetchUserVehicles = async (
   walletAddress: string,
 ): Promise<SharedVehiclesResponse> => {
-  const cachedToken = getCookieValue("dimo_auth_token");
+  const cachedToken = getCachedToken();
 
   if (!cachedToken) {
     throw new Error("No cached DIMO token found. Please authenticate first.");
@@ -82,7 +78,7 @@ const fetchUserVehicles = async (
 
 const fetchCurrentVehicleLocation = async (tokenId: number) => {
   // Get cached token from localStorage
-  const cachedToken = getCookieValue("dimo_auth_token");
+  const cachedToken = getCachedToken();
 
   if (!cachedToken) {
     throw new Error("No cached DIMO token found. Please authenticate first.");
@@ -103,7 +99,7 @@ const fetchCurrentVehicleLocation = async (tokenId: number) => {
 
 const fetchCurrentVehicleHistory = async (tokenId: number) => {
   // Get cached token from localStorage
-  const cachedToken = getCookieValue("dimo_auth_token");
+  const cachedToken = getCachedToken();
 
   if (!cachedToken) {
     throw new Error("No cached DIMO token found. Please authenticate first.");
