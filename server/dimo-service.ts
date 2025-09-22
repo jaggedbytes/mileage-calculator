@@ -1,4 +1,6 @@
 import { DIMO } from "@dimo-network/data-sdk";
+import { detectTrips, calculateDistance } from "./utils";
+import { type InsertTrip } from "@shared/schema";
 
 // DIMO data service using official SDK
 export class DimoService {
@@ -193,6 +195,132 @@ export class DimoService {
       console.error("Error fetching DIMO vehicle location:", error);
       throw error;
     }
+  }
+
+  /**
+   * Fetch detailed historical location data for trip detection
+   * @param vehicleId DIMO vehicle token ID
+   * @param from Start date in ISO format
+   * @param to End date in ISO format
+   * @param interval Data interval (default: "30m" for 30-minute intervals)
+   * @returns Array of location data points with timestamps
+   */
+  async getVehicleDetailedHistory(vehicleId: string, from: string, to: string, interval: string = "30m") {
+    try {
+      const tokenId = parseInt(vehicleId);
+
+      // Get Developer JWT and Vehicle JWT
+      const developerJwt = await this.getDeveloperJwt();
+      const vehicleJwt = await this.getVehicleJwt(developerJwt, tokenId);
+
+      // Query telemetry API for detailed location data
+      const query = `
+        {
+          signals(
+            tokenId: ${tokenId},
+            from: "${from}",
+            to: "${to}",
+            interval: "${interval}"
+          ) {
+            timestamp
+            currentLocationLatitude (agg: LAST)
+            currentLocationLongitude (agg: LAST)
+            dimoAftermarketHDOP (agg: LAST)
+          }
+        }
+      `;
+
+      console.log(`Fetching detailed history for vehicle: ${vehicleId} from ${from} to ${to}`);
+
+      const historyData = await this.dimo.telemetry.query({
+        ...vehicleJwt,
+        query: query,
+      });
+
+      console.log("DIMO Detailed History API response:", historyData);
+
+      const signalsData = historyData?.data?.signals;
+
+      if (!Array.isArray(signalsData) || signalsData.length === 0) {
+        return [];
+      }
+
+      // Convert to standardized format
+      return signalsData
+        .filter(point => point.currentLocationLatitude && point.currentLocationLongitude)
+        .map(point => ({
+          lat: point.currentLocationLatitude,
+          lng: point.currentLocationLongitude,
+          hdop: point.dimoAftermarketHDOP || 1.0,
+          timestamp: point.timestamp
+        }));
+
+    } catch (error) {
+      console.error("Error fetching DIMO vehicle detailed history:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect and process trips from vehicle historical data
+   * @param vehicleId DIMO vehicle token ID
+   * @param userId User ID for trip ownership
+   * @param from Start date in ISO format
+   * @param to End date in ISO format
+   * @returns Array of detected trips ready for storage
+   */
+  async detectVehicleTrips(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
+    try {
+      // Fetch detailed historical data
+      const locationHistory = await this.getVehicleDetailedHistory(vehicleId, from, to, "15m");
+
+      if (locationHistory.length < 2) {
+        console.log(`Insufficient location data for trip detection: ${locationHistory.length} points`);
+        return [];
+      }
+
+      console.log(`Processing ${locationHistory.length} location points for trip detection`);
+
+      // Detect trips using the utility function
+      const detectedTrips = detectTrips(locationHistory, 0.5, 15); // 0.5 mile minimum, 15 minute stops
+
+      console.log(`Detected ${detectedTrips.length} trips`);
+
+      // Convert to InsertTrip format
+      const trips: InsertTrip[] = detectedTrips.map(trip => ({
+        userId,
+        vehicleId,
+        startTime: trip.startTime,
+        endTime: trip.endTime,
+        startLatitude: trip.startLat,
+        startLongitude: trip.startLng,
+        endLatitude: trip.endLat,
+        endLongitude: trip.endLng,
+        distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
+        classification: "personal", // Default classification
+        notes: `Auto-detected trip (${trip.coordinates.length} GPS points)`
+      }));
+
+      return trips;
+
+    } catch (error) {
+      console.error("Error detecting vehicle trips:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Import trips for a vehicle for a specific date range
+   * @param vehicleId DIMO vehicle token ID
+   * @param userId User ID for trip ownership
+   * @param days Number of days back to import (default: 7)
+   * @returns Array of detected trips
+   */
+  async importVehicleTrips(vehicleId: string, userId: string, days: number = 7): Promise<InsertTrip[]> {
+    const to = new Date().toISOString();
+    const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    return this.detectVehicleTrips(vehicleId, userId, from, to);
   }
 }
 
