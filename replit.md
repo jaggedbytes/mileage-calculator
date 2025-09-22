@@ -13,8 +13,7 @@ This is a Replit template for running an app that integrates [Login with DIMO](h
   - API Key: `DIMO_API_KEY`
 
 To access secrets, click on the 4 squares (`All tools`) on the left panel, scroll down to find `Secrets`:
-![Tools](https://github.com/DIMO-Network/dimo-developer-kit/blob/replit-agent/README_tools.png)
-![Secrets](https://github.com/DIMO-Network/dimo-developer-kit/blob/replit-agent/README_secrets.png)
+![Instructions](https://github.com/DIMO-Network/dimo-developer-kit/blob/replit-agent/Replit_Instructions.png)
 
 ## Deployment Configuration
 

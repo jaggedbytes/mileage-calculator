@@ -26,9 +26,8 @@ export class DimoService {
   // Get Vehicle JWT for specific vehicle access (using new preferred method)
   async getVehicleJwt(developerJwt: any, tokenId: number) {
     try {
-      return await this.dimo.tokenexchange.exchange({
+      return await this.dimo.tokenexchange.getVehicleJwt({
         ...developerJwt,
-        privileges: [1, 3, 4, 5, 6],
         tokenId: tokenId,
       });
     } catch (error) {
@@ -72,21 +71,7 @@ export class DimoService {
     }
   }
 
-  async getVehicleData(vehicleId: string, userToken: string) {
-    try {
-      // Get vehicle information using the data SDK
-      const vehicleData = await this.dimo.identity.getVehicle({
-        tokenId: parseInt(vehicleId),
-      });
-
-      return vehicleData;
-    } catch (error) {
-      console.error("Error fetching DIMO vehicle data:", error);
-      throw error;
-    }
-  }
-
-  async getVehicleLocation(vehicleId: string, userToken: string) {
+  async getVehicleLocation(vehicleId: string) {
     try {
       const tokenId = parseInt(vehicleId);
 
@@ -144,7 +129,7 @@ export class DimoService {
     }
   }
 
-  async getVehicleWeeklyHistory(vehicleId: string, userToken: string) {
+  async getVehicleWeeklyHistory(vehicleId: string) {
     try {
       const tokenId = parseInt(vehicleId);
 
@@ -206,31 +191,6 @@ export class DimoService {
       };
     } catch (error) {
       console.error("Error fetching DIMO vehicle location:", error);
-      throw error;
-    }
-  }
-
-  async getVehicleTelemetry(vehicleId: string, signals: string[] = []) {
-    try {
-      // Get telemetry data for specified signals
-      const defaultSignals = [
-        "location.latitude",
-        "location.longitude",
-        "location.accuracy",
-        "speed",
-        "odometer",
-      ];
-
-      const requestedSignals = signals.length > 0 ? signals : defaultSignals;
-
-      const telemetryData = await this.dimo.telemetry.getLatest({
-        tokenId: parseInt(vehicleId),
-        signals: requestedSignals,
-      });
-
-      return telemetryData;
-    } catch (error) {
-      console.error("Error fetching DIMO vehicle telemetry:", error);
       throw error;
     }
   }
