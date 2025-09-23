@@ -97,6 +97,7 @@ export default function TripDetector() {
   const [tripNotes, setTripNotes] = useState<Record<string, string>>({});
   const [showStickyExport, setShowStickyExport] = useState(false);
   const [odometerData, setOdometerData] = useState<{start: number | null, end: number | null} | null>(null);
+  const [useKilometers, setUseKilometers] = useState(false);
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -360,9 +361,14 @@ export default function TripDetector() {
       encodeURIComponent(`${selectedVehicleData.definition.year}-${selectedVehicleData.definition.make}-${selectedVehicleData.definition.model}`) :
       selectedVehicle;
     
-    // Pass excluded trip IDs as a parameter
+    // Pass excluded trip IDs, odometer data, and units as parameters
     const excludedTripIds = Array.from(excludedTrips).join(',');
-    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}&excludedTrips=${encodeURIComponent(excludedTripIds)}`;
+    const odometerDataParam = odometerData ? 
+      encodeURIComponent(JSON.stringify({
+        start: odometerData.start,
+        end: odometerData.end
+      })) : '';
+    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}&excludedTrips=${encodeURIComponent(excludedTripIds)}&odometerData=${odometerDataParam}&useKilometers=${useKilometers}`;
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
@@ -374,7 +380,11 @@ export default function TripDetector() {
   };
 
   const formatDistance = (miles: number) => {
-    return `${miles.toFixed(2)} mi`;
+    if (useKilometers) {
+      return `${(miles * 1.60934).toFixed(2)} km`;
+    } else {
+      return `${miles.toFixed(2)} mi`;
+    }
   };
 
 
@@ -462,7 +472,34 @@ export default function TripDetector() {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            {/* Distance Unit Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Distance Units:</span>
+              <div className="flex bg-muted rounded-md p-1">
+                <button
+                  onClick={() => setUseKilometers(false)}
+                  className={`px-3 py-1 text-xs rounded-sm transition-colors ${
+                    !useKilometers 
+                      ? 'bg-background text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Miles
+                </button>
+                <button
+                  onClick={() => setUseKilometers(true)}
+                  className={`px-3 py-1 text-xs rounded-sm transition-colors ${
+                    useKilometers 
+                      ? 'bg-background text-foreground shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Kilometers
+                </button>
+              </div>
+            </div>
+            
             <Button
               onClick={handleDetectTrips}
               disabled={!selectedVehicle || isDetecting}
@@ -521,7 +558,10 @@ export default function TripDetector() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-blue-50 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
-                      {odometerData.start !== null ? `${odometerData.start.toLocaleString()} km` : 'N/A'}
+                      {odometerData.start !== null ? 
+                        `${useKilometers ? odometerData.start.toLocaleString() : (odometerData.start * 0.621371).toFixed(1)} ${useKilometers ? 'km' : 'mi'}` : 
+                        'N/A'
+                      }
                     </div>
                     <div className="text-sm text-blue-500 mt-1">Starting Reading</div>
                     <div className="text-xs text-gray-500">
@@ -530,7 +570,10 @@ export default function TripDetector() {
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg">
                     <div className="text-2xl font-bold text-green-600">
-                      {odometerData.end !== null ? `${odometerData.end.toLocaleString()} km` : 'N/A'}
+                      {odometerData.end !== null ? 
+                        `${useKilometers ? odometerData.end.toLocaleString() : (odometerData.end * 0.621371).toFixed(1)} ${useKilometers ? 'km' : 'mi'}` : 
+                        'N/A'
+                      }
                     </div>
                     <div className="text-sm text-green-500 mt-1">Ending Reading</div>
                     <div className="text-xs text-gray-500">
@@ -542,15 +585,21 @@ export default function TripDetector() {
                 <div className="mt-4 space-y-2">
                   <div className="text-center">
                     <div className="text-lg font-semibold text-green-700">
-                      Total Distance: {(odometerData.end - odometerData.start).toLocaleString()} km
+                      Total Distance: {useKilometers ? 
+                        `${(odometerData.end - odometerData.start).toLocaleString()} km` : 
+                        `${((odometerData.end - odometerData.start) * 0.621371).toFixed(1)} mi`
+                      }
                     </div>
                     <div className="text-sm text-green-600">
-                      ({((odometerData.end - odometerData.start) * 0.621371).toFixed(1)} miles) - Vehicle Odometer
+                      Vehicle Odometer
                     </div>
                   </div>
                   <div className="text-center">
                     <div className="text-lg font-semibold text-gray-500">
-                      GPS Distance: {detectedTrips.reduce((sum, trip) => sum + trip.distance, 0).toFixed(2)} miles
+                      GPS Distance: {useKilometers ? 
+                        `${(detectedTrips.reduce((sum, trip) => sum + trip.distance, 0) * 1.60934).toFixed(2)} km` : 
+                        `${detectedTrips.reduce((sum, trip) => sum + trip.distance, 0).toFixed(2)} mi`
+                      }
                     </div>
                     <div className="text-sm text-gray-400">
                       (Sum of GPS-calculated trips)

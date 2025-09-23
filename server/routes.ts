@@ -363,7 +363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Export mileage data as CSV
     app.get("/api/mileage/export", async (req, res) => {
     try {
-      const { userId, month, vehicleId, vehicleInfo, dateRange, excludedTrips } = req.query; // month in YYYY-MM format
+      const { userId, month, vehicleId, vehicleInfo, dateRange, excludedTrips, odometerData, useKilometers } = req.query; // month in YYYY-MM format
       
       if (!userId || !month) {
         res.status(400).json({ message: "userId and month parameters are required" });
@@ -439,8 +439,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
-        // Create CSV content - show individual trips instead of daily aggregations
-        const csvHeader = "Date,Time,Classification,Distance (Miles),Start Location,End Location,Notes\n";
+        // Parse odometer data if provided
+        let parsedOdometerData = null;
+        if (odometerData && typeof odometerData === 'string') {
+          try {
+            parsedOdometerData = JSON.parse(decodeURIComponent(odometerData));
+          } catch (error) {
+            console.error('Error parsing odometer data:', error);
+          }
+        }
+
+        // Determine units based on parameter
+        const useKm = useKilometers === 'true';
+        const distanceUnit = useKm ? 'km' : 'mi';
+        const odometerUnit = useKm ? 'km' : 'mi';
+        
+        // Create CSV content - show individual trips with odometer column
+        const csvHeader = `Date,Time,Classification,Distance (${distanceUnit}),Odometer (${odometerUnit}),Start Location,End Location,Notes\n`;
+        
         const csvRows = allTrips
           .map(trip => {
             const tripDate = new Date(trip.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
@@ -453,8 +469,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const endLoc = `${trip.endLatitude.toFixed(4)}, ${trip.endLongitude.toFixed(4)}`;
             const notes = (trip.userNotes || '').replace(/"/g, '""'); // Escape quotes for CSV
             
+            // Extract odometer reading from trip notes if available
+            let odometerReading = '';
+            if (trip.notes) {
+              try {
+                const tripData = JSON.parse(trip.notes);
+                if (tripData.coordinates && tripData.coordinates.length > 0) {
+                  // Find the first coordinate with odometer data
+                  const coordWithOdometer = tripData.coordinates.find((c: any) => c.odometer !== null && c.odometer !== undefined);
+                  if (coordWithOdometer) {
+                    // Convert odometer from km to miles if needed
+                    const odometerValue = useKm ? 
+                      coordWithOdometer.odometer : 
+                      (coordWithOdometer.odometer * 0.621371).toFixed(1);
+                    odometerReading = odometerValue.toString();
+                  }
+                }
+              } catch (error) {
+                // Ignore parsing errors
+              }
+            }
+            
+            // Convert trip distance based on units
+            const tripDistance = useKm ? 
+              (trip.distance * 1.60934).toFixed(2) : 
+              trip.distance.toFixed(2);
+            
             const classification = trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1);
-            return `${tripDate},${tripTime},${classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}","${notes}"`;
+            return `${tripDate},${tripTime},${classification},${tripDistance},${odometerReading},"${startLoc}","${endLoc}","${notes}"`;
           })
           .join('\n');
         
