@@ -36,19 +36,20 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
   const polylineRef = useRef<L.Polyline | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
   const endMarkerRef = useRef<L.Marker | null>(null);
+  const [isMapActive, setIsMapActive] = useState(false);
 
   // Initialize map only when expanded
   useEffect(() => {
     if (!mapRef.current || !isExpanded) return;
 
-    // Initialize map with scroll wheel zoom disabled by default
+    // Initialize map with all interactions disabled by default
     mapInstanceRef.current = L.map(mapRef.current, {
       scrollWheelZoom: false,
       doubleClickZoom: false,
       touchZoom: false,
       boxZoom: false,
       keyboard: false,
-      dragging: true
+      dragging: false
     }).setView(
       [trip.startLatitude, trip.startLongitude],
       13,
@@ -58,76 +59,75 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
       attribution: "© OpenStreetMap contributors",
     }).addTo(mapInstanceRef.current);
 
-    // Enable zoom when map is clicked/focused
-    const enableZoom = () => {
+    // Enable all interactions when map is clicked/focused
+    const enableInteractions = () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.scrollWheelZoom.enable();
         mapInstanceRef.current.doubleClickZoom.enable();
         mapInstanceRef.current.touchZoom.enable();
         mapInstanceRef.current.boxZoom.enable();
         mapInstanceRef.current.keyboard.enable();
+        mapInstanceRef.current.dragging.enable();
       }
     };
 
-    // Disable zoom when map loses focus
-    const disableZoom = () => {
+    // Disable all interactions when map loses focus
+    const disableInteractions = () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.scrollWheelZoom.disable();
         mapInstanceRef.current.doubleClickZoom.disable();
         mapInstanceRef.current.touchZoom.disable();
         mapInstanceRef.current.boxZoom.disable();
         mapInstanceRef.current.keyboard.disable();
+        mapInstanceRef.current.dragging.disable();
       }
     };
 
-    // Track if map is currently active/focused
-    let isMapActive = false;
-
     // Add event listeners for focus/blur (mouse and touch)
     mapInstanceRef.current.on('click', () => {
-      enableZoom();
-      isMapActive = true;
+      enableInteractions();
+      setIsMapActive(true);
     });
     mapInstanceRef.current.on('mouseenter', () => {
-      enableZoom();
-      isMapActive = true;
+      enableInteractions();
+      setIsMapActive(true);
     });
     mapInstanceRef.current.on('mouseleave', () => {
-      disableZoom();
-      isMapActive = false;
+      disableInteractions();
+      setIsMapActive(false);
     });
     
     // Touch events for mobile devices
     mapInstanceRef.current.on('touchstart', () => {
-      enableZoom();
-      isMapActive = true;
+      enableInteractions();
+      setIsMapActive(true);
     });
     mapInstanceRef.current.on('touchend', () => {
-      // Keep zoom enabled after touch ends (mobile users expect this)
+      // Keep interactions enabled after touch ends (mobile users expect this)
       // Only disable if they touch outside the map
     });
     
-    // Disable zoom when clicking/touching outside the map
+    // Disable interactions when clicking/touching outside the map
     const handleClickOutside = (event: MouseEvent) => {
       if (mapRef.current && !mapRef.current.contains(event.target as Node)) {
-        disableZoom();
-        isMapActive = false;
+        disableInteractions();
+        setIsMapActive(false);
       }
     };
     
     const handleTouchOutside = (event: TouchEvent) => {
       if (mapRef.current && !mapRef.current.contains(event.target as Node)) {
-        disableZoom();
-        isMapActive = false;
+        disableInteractions();
+        setIsMapActive(false);
       }
     };
     
-    // Disable zoom when vertical scroll is detected (user scrolling the page)
+    // Disable interactions when vertical scroll is detected (user scrolling the page)
     const handleVerticalScroll = (event: WheelEvent) => {
       if (isMapActive && event.deltaY !== 0) {
         // Vertical scroll detected while map is active - lock the map
-        disableZoom();
-        isMapActive = false;
+        disableInteractions();
+        setIsMapActive(false);
       }
     };
     
@@ -229,11 +229,20 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
       
       {isExpanded && (
         <div className="mt-2">
-          <div
-            ref={mapRef}
-            className="w-full h-64 rounded-lg border z-40"
-            style={{ minHeight: '256px' }}
-          />
+          <div className="relative">
+            <div
+              ref={mapRef}
+              className="w-full h-64 rounded-lg border z-40"
+              style={{ minHeight: '256px' }}
+            />
+            {!isMapActive && (
+              <div className="absolute inset-0 bg-black/20 rounded-lg flex items-center justify-center z-50 pointer-events-none">
+                <div className="bg-white/90 backdrop-blur-sm px-3 py-2 rounded-md shadow-lg">
+                  <p className="text-sm font-medium text-gray-700">Tap to interact with map</p>
+                </div>
+              </div>
+            )}
+          </div>
           <div className="mt-2 text-xs text-muted-foreground text-center">
             {trip.coordinates && Array.isArray(trip.coordinates) && trip.coordinates.length > 0 
               ? `Route with ${trip.coordinates.length} GPS points` 
