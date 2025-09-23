@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Car, Download, Play, MapPin, Loader2 } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
+import TripMap from "./trip-map";
 
 interface Trip {
   id: string;
@@ -17,6 +18,7 @@ interface Trip {
   startLongitude: number;
   endLatitude: number;
   endLongitude: number;
+  coordinates?: Array<{lat: number, lng: number, timestamp: string}>;
 }
 
 interface Vehicle {
@@ -87,6 +89,7 @@ export default function TripDetector() {
     to: new Date().toISOString().split('T')[0]
   });
   const [isUpdatingClassification, setIsUpdatingClassification] = useState<string | null>(null);
+  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set());
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -100,8 +103,6 @@ export default function TripDetector() {
 
     setIsDetecting(true);
     try {
-      console.log("Detecting trips for vehicle:", selectedVehicle, "user:", walletAddress);
-      
       const response = await fetch(`/api/trips/detect/${selectedVehicle}`, {
         method: 'POST',
         headers: {
@@ -114,18 +115,15 @@ export default function TripDetector() {
         })
       });
 
-      console.log("Trip detection response status:", response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Server error response:", errorText);
         throw new Error(`Failed to detect trips: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const result: TripDetectionResponse = await response.json();
-      console.log("Trip detection result:", result);
-      setDetectedTrips(result.trips);
-      setDetectionResult(result);
+          const result: TripDetectionResponse = await response.json();
+          setDetectedTrips(result.trips);
+          setDetectionResult(result);
     } catch (error) {
       console.error("Error detecting trips:", error);
       alert(`Failed to detect trips: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -165,6 +163,18 @@ export default function TripDetector() {
     }
   };
 
+  const toggleMap = (tripId: string) => {
+    setExpandedMaps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tripId)) {
+        newSet.delete(tripId);
+      } else {
+        newSet.add(tripId);
+      }
+      return newSet;
+    });
+  };
+
   const handleExportCSV = async () => {
     if (!walletAddress || detectedTrips.length === 0 || !selectedVehicle) return;
 
@@ -185,12 +195,7 @@ export default function TripDetector() {
       encodeURIComponent(`${selectedVehicleData.definition.year}-${selectedVehicleData.definition.make}-${selectedVehicleData.definition.model}`) :
       selectedVehicle;
     
-    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}`;
-    
-    console.log('CSV Export URL:', url);
-    console.log('Vehicle info param:', vehicleInfoParam);
-    console.log('Date range:', dateRangeStr);
-    console.log('Selected vehicle data:', selectedVehicleData);
+        const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}`;
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
@@ -401,12 +406,23 @@ export default function TripDetector() {
                           Other
                         </Button>
                       </div>
-                      
-                      {trip.notes && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          {trip.notes}
-                        </div>
-                      )}
+
+                      {/* Trip Map */}
+                      <TripMap
+                        trip={{
+                          ...trip,
+                          coordinates: trip.notes ? (() => {
+                            try {
+                              const parsed = JSON.parse(trip.notes);
+                              return parsed.coordinates || [];
+                            } catch {
+                              return [];
+                            }
+                          })() : []
+                        }}
+                        isExpanded={expandedMaps.has(trip.id)}
+                        onToggle={() => toggleMap(trip.id)}
+                      />
                     </div>
                   ))}
                 </div>

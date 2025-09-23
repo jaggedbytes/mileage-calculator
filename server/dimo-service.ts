@@ -65,7 +65,6 @@ export class DimoService {
         query: query,
       });
 
-      console.log("DIMO Identity API response:", response);
       return response?.data?.vehicles || { nodes: [] };
     } catch (error) {
       console.error("Error fetching DIMO vehicles:", error);
@@ -107,7 +106,6 @@ export class DimoService {
         query: query,
       });
 
-      console.log("DIMO Telemetry API response:", locationData);
 
       const signalsData = locationData?.data?.signalsLatest;
       const latitude = signalsData?.currentLocationLatitude?.value;
@@ -156,14 +154,12 @@ export class DimoService {
         }
       `;
 
-      console.log(query);
 
       const historyData = await this.dimo.telemetry.query({
         ...vehicleJwt,
         query: query,
       });
 
-      console.log("DIMO Telemetry API response:", historyData);
 
       const signalsData = historyData?.data?.signals;
 
@@ -207,13 +203,10 @@ export class DimoService {
    */
   async getVehicleIgnitionAndLocationData(vehicleId: string, from: string, to: string, interval: string = "5m") {
     try {
-      console.log(`Getting ignition data for vehicle ${vehicleId} from ${from} to ${to}`);
       const tokenId = parseInt(vehicleId);
 
       // Get Developer JWT and Vehicle JWT
-      console.log("Getting developer JWT...");
       const developerJwt = await this.getDeveloperJwt();
-      console.log("Getting vehicle JWT...");
       const vehicleJwt = await this.getVehicleJwt(developerJwt, tokenId);
 
       // Query telemetry API for ignition and location data
@@ -236,21 +229,15 @@ export class DimoService {
         }
       `;
 
-      console.log(`Fetching ignition and location data for vehicle: ${vehicleId} from ${from} to ${to}`);
-      console.log("Query:", query);
 
       const historyData = await this.dimo.telemetry.query({
         ...vehicleJwt,
         query: query,
       });
 
-      console.log("Raw DIMO API response:", JSON.stringify(historyData, null, 2));
 
       const signalsData = historyData?.data?.signals;
-      console.log(`DIMO Ignition/Location API returned ${signalsData?.length || 0} data points`);
-
       if (!Array.isArray(signalsData) || signalsData.length === 0) {
-        console.log("No signals data available");
         return [];
       }
 
@@ -267,7 +254,6 @@ export class DimoService {
           hdop: point.dimoAftermarketHDOP ? parseFloat(point.dimoAftermarketHDOP) : 1.0,
         }));
 
-      console.log(`Processed ${processedData.length} data points`);
       return processedData;
 
     } catch (error) {
@@ -351,15 +337,10 @@ export class DimoService {
    */
   async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
     try {
-      console.log(`Starting ignition-based trip detection for vehicle ${vehicleId}`);
-      
       // Fetch ignition and location data with higher frequency for accuracy
       const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1m");
 
-      console.log(`Retrieved ${ignitionData.length} ignition data points`);
-
       if (ignitionData.length < 2) {
-        console.log(`Insufficient ignition data for trip detection: ${ignitionData.length} points`);
         return [];
       }
 
@@ -367,16 +348,11 @@ export class DimoService {
       const hasIgnitionData = ignitionData.some(point => point.isIgnitionOn !== null);
       
       if (!hasIgnitionData) {
-        console.log("No ignition data available, falling back to location-based trip detection");
         return this.detectVehicleTripsFromLocation(vehicleId, userId, from, to, ignitionData);
       }
 
-      console.log(`Processing ${ignitionData.length} ignition/location points for trip detection`);
-
       // Detect trips using ignition signals
       const detectedTrips = this.detectTripsFromIgnition(ignitionData);
-
-      console.log(`Detected ${detectedTrips.length} trips using ignition signals`);
 
       // Convert to InsertTrip format
       const trips: InsertTrip[] = detectedTrips.map(trip => ({
@@ -390,10 +366,12 @@ export class DimoService {
         endLongitude: trip.endLng,
         distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
         classification: "personal", // Default classification
-        notes: `Auto-detected trip via ignition (${trip.coordinates.length} GPS points)`
+        notes: JSON.stringify({
+          description: `Auto-detected trip via ignition (${trip.coordinates.length} GPS points)`,
+          coordinates: trip.coordinates
+        })
       }));
 
-      console.log(`Converted to ${trips.length} InsertTrip objects`);
       return trips;
 
     } catch (error) {
@@ -409,7 +387,6 @@ export class DimoService {
    */
   private async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData: any[]): Promise<InsertTrip[]> {
     try {
-      console.log(`Starting location-based trip detection for vehicle ${vehicleId}`);
       
       // Filter out points without location data
       const validLocationData = locationData.filter(point => 
@@ -417,16 +394,11 @@ export class DimoService {
       );
 
       if (validLocationData.length < 2) {
-        console.log(`Insufficient location data for trip detection: ${validLocationData.length} points`);
         return [];
       }
 
-      console.log(`Processing ${validLocationData.length} location points for trip detection`);
-
       // Use the existing location-based trip detection
       const detectedTrips = detectTrips(validLocationData, 0.5, 15); // 0.5 mile minimum, 15 minute stops
-
-      console.log(`Detected ${detectedTrips.length} trips using location data`);
 
       // Convert to InsertTrip format
       const trips: InsertTrip[] = detectedTrips.map(trip => ({
@@ -440,10 +412,12 @@ export class DimoService {
         endLongitude: trip.endLng,
         distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
         classification: "personal", // Default classification
-        notes: `Auto-detected trip via location (${trip.coordinates.length} GPS points)`
+        notes: JSON.stringify({
+          description: `Auto-detected trip via location (${trip.coordinates.length} GPS points)`,
+          coordinates: trip.coordinates
+        })
       }));
 
-      console.log(`Converted to ${trips.length} InsertTrip objects`);
       return trips;
 
     } catch (error) {
@@ -642,7 +616,10 @@ export class DimoService {
         endLongitude: trip.endLng,
         distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
         classification: "personal", // Default classification
-        notes: `Auto-detected trip (${trip.coordinates.length} GPS points)`
+        notes: JSON.stringify({
+          description: `Auto-detected trip (${trip.coordinates.length} GPS points)`,
+          coordinates: trip.coordinates
+        })
       }));
 
       return trips;

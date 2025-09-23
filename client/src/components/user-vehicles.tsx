@@ -132,34 +132,11 @@ export default function UserVehicles({ onVehicleSelect, onLocationUpdate }: User
   const { data, isLoading, error } = useQuery({
     queryKey: ["/api/dimo/vehicles", walletAddress],
     queryFn: () => {
-      console.log(
-        "Frontend: Making API call to fetch vehicles for wallet:",
-        walletAddress,
-      );
       return fetchUserVehicles(walletAddress!);
     },
     enabled: isAuthenticated && !!walletAddress,
   });
 
-  // Log query state changes
-  useEffect(() => {
-    console.log("UserVehicles query state update:", {
-      isAuthenticated,
-      walletAddress,
-      isLoading,
-      error: error?.message,
-      data,
-      queryEnabled: isAuthenticated && !!walletAddress,
-    });
-  }, [isAuthenticated, walletAddress, isLoading, error, data]);
-
-  // Also log the final authentication status for the user
-  console.log("UserVehicles render - Final auth state:", {
-    isAuthenticated,
-    walletAddress,
-    isFromCache,
-    vehicleCount: data?.vehicles?.length || 0,
-  });
 
   const locationMutation = useMutation({
     mutationFn: fetchCurrentVehicleLocation,
@@ -221,7 +198,6 @@ export default function UserVehicles({ onVehicleSelect, onLocationUpdate }: User
   const historyMutation = useMutation({
     mutationFn: fetchCurrentVehicleHistory,
     onSuccess: (historyData) => {
-      console.log("Vehicle history data received:", historyData);
       toast({
         title: "Weekly History Loaded",
         description: `Found ${historyData?.datapoints} historical data points`,

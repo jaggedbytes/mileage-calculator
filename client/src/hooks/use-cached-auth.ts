@@ -26,15 +26,6 @@ export function useCachedDimoAuth(): CachedAuthState {
   const [cachedEmail, setCachedEmail] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Debug authentication state
-  console.log('useCachedDimoAuth - Current state:', {
-    dimoSdkAuth: isAuthenticated,
-    dimoSdkWallet: walletAddress,
-    dimoSdkEmail: email,
-    cachedWallet: cachedWalletAddress,
-    cachedEmail: cachedEmail,
-    isInitialized
-  });
 
   // Load cached data on mount and listen for storage changes
   useEffect(() => {
@@ -59,7 +50,6 @@ export function useCachedDimoAuth(): CachedAuthState {
   // When DIMO SDK reports authenticated, cache the wallet address
   useEffect(() => {
     if (isAuthenticated && walletAddress) {
-      console.log('Caching wallet address:', walletAddress, 'email:', email);
       localStorage.setItem(CACHED_WALLET_KEY, walletAddress);
       if (email) {
         localStorage.setItem(CACHED_EMAIL_KEY, email);

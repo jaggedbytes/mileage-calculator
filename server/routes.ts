@@ -112,7 +112,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      console.log("Fetching real-time location for vehicle:", vehicleId);
 
       // Use the real DIMO service to get vehicle location
       const locationData = await dimoService.getVehicleLocation(vehicleId);
@@ -145,11 +144,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      console.log("Fetching weekly location for vehicle:", vehicleId);
 
       // Use the real DIMO service to get vehicle location
       const locationData = await dimoService.getVehicleWeeklyHistory(vehicleId);
-      console.log("Weekly location data:", locationData);
       // Automatically save to GPS storage for visualization
       const savedData = await storage.saveGpsData(locationData);
 
@@ -266,10 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { vehicleId } = req.params;
       const { userId, from, to } = req.body;
       
-      console.log(`Trip detection request:`, { vehicleId, userId, from, to });
-      
       if (!userId) {
-        console.log("Missing userId in request");
         res.status(400).json({ message: "userId is required" });
         return;
       }
@@ -278,19 +272,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fromDate = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const toDate = to || new Date().toISOString();
 
-      console.log(`Detecting trips for vehicle ${vehicleId}, user ${userId}, from ${fromDate} to ${toDate}`);
-      
       // Detect trips using ignition signals
       const detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
-      
-      console.log(`Detected ${detectedTrips.length} trips`);
       
       // Save trips to storage
       const savedTrips = await Promise.all(
         detectedTrips.map(trip => storage.createTrip(trip))
       );
-      
-      console.log(`Saved ${savedTrips.length} trips to storage`);
       
       res.json({
         message: `Successfully detected ${savedTrips.length} trips using ignition signals`,
@@ -315,7 +303,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { tripId } = req.params;
         const { classification } = req.body;
         
-        console.log(`Updating trip ${tripId} classification to: ${classification}`);
         
         if (!classification || !['business', 'personal', 'other'].includes(classification)) {
           res.status(400).json({ message: "Invalid classification. Must be 'business', 'personal', or 'other'" });
@@ -329,7 +316,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
-        console.log(`Successfully updated trip ${tripId} classification to: ${updatedTrip.classification}`);
         res.json({ message: "Classification updated successfully", trip: updatedTrip });
       } catch (error) {
         console.error("Error updating trip classification:", error);
@@ -350,9 +336,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get all trips for the user
         const allTrips = await storage.getTripsByUser(userId as string);
         
-        console.log(`Exporting CSV for user ${userId}, month ${month}, found ${allTrips.length} trips`);
-        console.log(`Trip classifications:`, allTrips.map(trip => ({ id: trip.id, classification: trip.classification, startTime: trip.startTime })));
-        console.log(`Query parameters:`, { userId, month, vehicleId, vehicleInfo });
       
         // Get vehicle info from URL parameter or fallback to vehicleId
         let vehicleInfoForFilename = "";

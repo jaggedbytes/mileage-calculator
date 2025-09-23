@@ -110,7 +110,6 @@ export function detectTrips(
                                      new Date(lastMovement.timestamp).getTime();
         const minutesSinceLastMovement = timeSinceLastMovement / (1000 * 60);
         
-        console.log(`Vehicle stopped for ${minutesSinceLastMovement.toFixed(1)} minutes (threshold: ${maxStopDuration} min)`);
         
         if (minutesSinceLastMovement >= maxStopDuration) {
           // End the current trip

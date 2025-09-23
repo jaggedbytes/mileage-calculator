@@ -32,7 +32,6 @@ export default function DimoAuth() {
             localStorage.setItem("dimo_cached_token", jwt);
           }
         } catch (error) {
-          console.log("Could not get JWT from DIMO SDK state:", error);
         }
       }
       
@@ -63,7 +62,6 @@ export default function DimoAuth() {
   };
 
   const handleLogoutSuccess = () => {
-    console.log("DIMO logout successful");
     // Clear cached wallet address on logout
     if (typeof window !== "undefined") {
       localStorage.removeItem("dimo_cached_wallet_address");
