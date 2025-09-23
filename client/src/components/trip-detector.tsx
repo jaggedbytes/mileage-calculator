@@ -712,17 +712,6 @@ export default function TripDetector() {
                           </div>
                         </div>
                       
-                      <div className="text-sm text-muted-foreground mb-3">
-                        <div className="flex items-center gap-1 mb-1">
-                          <MapPin className="h-3 w-3" />
-                          Start: {trip.startLatitude.toFixed(4)}, {trip.startLongitude.toFixed(4)}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          End: {trip.endLatitude.toFixed(4)}, {trip.endLongitude.toFixed(4)}
-                        </div>
-                      </div>
-
                       {/* Exclude from Export Button */}
                       <div className="mt-2">
                         <Button
@@ -747,9 +736,9 @@ export default function TripDetector() {
 
                       {/* Category Buttons */}
                       <div className="flex flex-wrap gap-2">
-                        <div className="mt-2 text-xs text-gray-600 w-full">
-                          <p><strong>Category</strong></p>
-                        </div>
+                        <label className="mt-2 text-sm font-medium w-full">
+                          Category
+                        </label>
                         <Button
                           size="sm"
                           variant={trip.classification === 'business' ? 'default' : 'outline'}
@@ -784,56 +773,44 @@ export default function TripDetector() {
 
                       {/* Trip Notes */}
                       <div className="mt-3">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="mb-2">
                           <label className="text-sm font-medium">Notes</label>
-                          {editingNotes !== trip.id && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleEditNotes(trip.id)}
-                              className="text-xs h-6 px-2"
-                            >
-                              <Edit3 className="h-3 w-3 mr-1" />
-                              Edit
-                            </Button>
-                          )}
                         </div>
                         
-                        {editingNotes === trip.id ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={tripNotes[trip.id] || trip.userNotes || ''}
-                              onChange={(e) => setTripNotes(prev => ({ ...prev, [trip.id]: e.target.value }))}
-                              placeholder="Add notes about this trip..."
-                              className="w-full p-4 text-sm border rounded-sm resize-none"
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleSaveNotes(trip.id)}
-                                className="text-xs h-6 px-2"
-                              >
-                                <Save className="h-3 w-3 mr-1" />
-                                Save
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleCancelNotes(trip.id)}
-                                className="text-xs h-6 px-2"
-                              >
-                                <XIcon className="h-3 w-3 mr-1" />
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground min-h-[2rem] p-4 border rounded-sm bg-muted/50">
-                            {trip.userNotes || 'No notes added'}
-                          </div>
-                        )}
+                        <textarea
+                          value={tripNotes[trip.id] !== undefined ? tripNotes[trip.id] : (trip.userNotes || '')}
+                          onChange={(e) => setTripNotes(prev => ({ ...prev, [trip.id]: e.target.value }))}
+                          onFocus={() => setEditingNotes(trip.id)}
+                          onBlur={() => {
+                            // Auto-save on blur if there are changes
+                            if (tripNotes[trip.id] !== undefined && tripNotes[trip.id] !== trip.userNotes) {
+                              handleSaveNotes(trip.id);
+                            }
+                          }}
+                          placeholder="Click here to add notes about this trip..."
+                          className="w-full p-4 text-sm border rounded-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                          rows={2}
+                        />
                       </div>
+                      
+
+                      {/* Trip Start and End Coordinates */}
+                      <div className="mt-3">
+                        <div className="mb-2">
+                          <label className="text-sm font-medium">Traveled Route</label>
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-3">
+                          <div className="flex items-center gap-1 mb-1">
+                            <MapPin className="h-3 w-3" />
+                            Start: {trip.startLatitude.toFixed(4)}, {trip.startLongitude.toFixed(4)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            End: {trip.endLatitude.toFixed(4)}, {trip.endLongitude.toFixed(4)}
+                          </div>
+                        </div>
+                      </div>
+
 
                       {/* Trip Map */}
                       <TripMap
