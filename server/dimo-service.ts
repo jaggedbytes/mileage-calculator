@@ -338,7 +338,7 @@ export class DimoService {
   async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
     try {
       // Fetch ignition and location data with higher frequency for accuracy
-      const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1m");
+      const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1s");
 
       if (ignitionData.length < 2) {
         return [];
