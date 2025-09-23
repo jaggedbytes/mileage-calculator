@@ -383,11 +383,140 @@ export class DimoService {
   }
 
   /**
+   * Improved location-based trip detection that considers time gaps between data points
+   */
+  private detectTripsWithTimeGaps(
+    coordinates: Array<{lat: number, lng: number, timestamp: string}>,
+    minTripDistance: number = 0.5,
+    maxStopDuration: number = 15,
+    maxTimeGapMinutes: number = 120
+  ): Array<{
+    startTime: string;
+    endTime: string;
+    startLat: number;
+    startLng: number;
+    endLat: number;
+    endLng: number;
+    distance: number;
+    coordinates: Array<{lat: number, lng: number, timestamp: string}>;
+  }> {
+    if (coordinates.length < 2) {
+      return [];
+    }
+    
+    const trips = [];
+    let currentTripStart: {lat: number, lng: number, timestamp: string} | null = null;
+    let currentTripCoords: Array<{lat: number, lng: number, timestamp: string}> = [];
+    let lastMovement = coordinates[0];
+    
+    for (let i = 1; i < coordinates.length; i++) {
+      const current = coordinates[i];
+      const distanceFromLast = this.calculateDistance(
+        lastMovement.lat, lastMovement.lng,
+        current.lat, current.lng
+      );
+      
+      // Check time gap between data points
+      const timeGap = new Date(current.timestamp).getTime() - new Date(lastMovement.timestamp).getTime();
+      const timeGapMinutes = timeGap / (1000 * 60);
+      
+      // If there's a large time gap, end any current trip
+      if (timeGapMinutes > maxTimeGapMinutes) {
+        if (currentTripStart && currentTripCoords.length > 1) {
+          const tripDistance = this.calculateTotalDistance(currentTripCoords);
+          if (tripDistance >= minTripDistance) {
+            const actualEndTime = currentTripCoords[currentTripCoords.length - 1].timestamp;
+            trips.push({
+              startTime: currentTripStart.timestamp,
+              endTime: actualEndTime,
+              startLat: currentTripStart.lat,
+              startLng: currentTripStart.lng,
+              endLat: lastMovement.lat,
+              endLng: lastMovement.lng,
+              distance: tripDistance,
+              coordinates: [...currentTripCoords]
+            });
+          }
+        }
+        // Reset for next trip
+        currentTripStart = null;
+        currentTripCoords = [];
+        lastMovement = current;
+        continue;
+      }
+      
+      // Check if vehicle is moving (distance > 0.01 miles = ~50 feet)
+      const isMoving = distanceFromLast > 0.01;
+      
+      if (isMoving) {
+        // Vehicle is moving
+        if (!currentTripStart) {
+          // Start a new trip
+          currentTripStart = lastMovement;
+          currentTripCoords = [lastMovement];
+        }
+        currentTripCoords.push(current);
+        lastMovement = current;
+      } else {
+        // Vehicle appears to be stopped
+        if (currentTripStart && currentTripCoords.length > 1) {
+          // Check if we've been stopped long enough to end the trip
+          const timeSinceLastMovement = new Date(current.timestamp).getTime() - 
+                                       new Date(lastMovement.timestamp).getTime();
+          const minutesSinceLastMovement = timeSinceLastMovement / (1000 * 60);
+          
+          if (minutesSinceLastMovement >= maxStopDuration) {
+            // End the current trip
+            const tripDistance = this.calculateTotalDistance(currentTripCoords);
+            
+            if (tripDistance >= minTripDistance) {
+              const actualEndTime = currentTripCoords[currentTripCoords.length - 1].timestamp;
+              trips.push({
+                startTime: currentTripStart.timestamp,
+                endTime: actualEndTime,
+                startLat: currentTripStart.lat,
+                startLng: currentTripStart.lng,
+                endLat: lastMovement.lat,
+                endLng: lastMovement.lng,
+                distance: tripDistance,
+                coordinates: [...currentTripCoords]
+              });
+            }
+            
+            // Reset for next trip
+            currentTripStart = null;
+            currentTripCoords = [];
+          }
+        }
+      }
+    }
+    
+    // Handle case where trip is still ongoing at the end of data
+    if (currentTripStart && currentTripCoords.length > 1) {
+      const tripDistance = this.calculateTotalDistance(currentTripCoords);
+      if (tripDistance >= minTripDistance) {
+        const lastCoord = currentTripCoords[currentTripCoords.length - 1];
+        trips.push({
+          startTime: currentTripStart.timestamp,
+          endTime: lastCoord.timestamp,
+          startLat: currentTripStart.lat,
+          startLng: currentTripStart.lng,
+          endLat: lastCoord.lat,
+          endLng: lastCoord.lng,
+          distance: tripDistance,
+          coordinates: [...currentTripCoords]
+        });
+      }
+    }
+    
+    return trips;
+  }
+
+  /**
    * Fallback trip detection using location data when ignition data is not available
    */
   private async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData: any[]): Promise<InsertTrip[]> {
     try {
-      
       // Filter out points without location data
       const validLocationData = locationData.filter(point => 
         point.lat !== null && point.lng !== null && point.timestamp
@@ -397,8 +526,8 @@ export class DimoService {
         return [];
       }
 
-      // Use the existing location-based trip detection
-      const detectedTrips = detectTrips(validLocationData, 0.5, 15); // 0.5 mile minimum, 15 minute stops
+      // Use improved location-based trip detection that considers time gaps
+      const detectedTrips = this.detectTripsWithTimeGaps(validLocationData, 0.5, 15, 120); // 0.5 mile minimum, 15 minute stops, 2 hour max gap
 
       // Convert to InsertTrip format
       const trips: InsertTrip[] = detectedTrips.map(trip => ({
@@ -448,6 +577,7 @@ export class DimoService {
     distance: number;
     coordinates: Array<{lat: number, lng: number, timestamp: string}>;
   }> {
+
     const trips = [];
     let currentTripStart: {lat: number, lng: number, timestamp: string} | null = null;
     let currentTripCoords: Array<{lat: number, lng: number, timestamp: string}> = [];
@@ -459,63 +589,63 @@ export class DimoService {
       const isIgnitionOn = point.isIgnitionOn === true; // Only true when explicitly true
       const hasLocation = point.lat !== null && point.lng !== null;
 
-      if (isIgnitionOn && !currentTripStart) {
-        // Trip starts - ignition turned on
-        tripStartTime = point.timestamp;
-        lastOdometer = point.odometer;
-        
-        if (hasLocation) {
-          currentTripStart = {
-            lat: point.lat,
-            lng: point.lng,
+        if (isIgnitionOn && !currentTripStart) {
+          // Trip starts - ignition turned on
+          tripStartTime = point.timestamp;
+          lastOdometer = point.odometer;
+          
+          if (hasLocation) {
+            currentTripStart = {
+              lat: point.lat!,
+              lng: point.lng!,
+              timestamp: point.timestamp
+            };
+            currentTripCoords = [currentTripStart];
+          }
+        } else if (point.isIgnitionOn === false && currentTripStart && tripStartTime) {
+          // Trip ends - ignition turned off
+          const tripEndTime = point.timestamp;
+          let distance = 0;
+          
+          // Calculate distance using GPS coordinates if available
+          if (currentTripCoords.length >= 2) {
+            distance = this.calculateTotalDistance(currentTripCoords);
+          } else if (point.odometer !== null && lastOdometer !== null) {
+            // Fallback to odometer reading if GPS data is insufficient
+            distance = (point.odometer - lastOdometer) * 0.621371; // Convert km to miles
+          }
+
+          // Only include trips with meaningful distance (at least 0.1 miles)
+          if (distance >= 0.1) {
+            const endCoord = currentTripCoords.length > 0 ? 
+              currentTripCoords[currentTripCoords.length - 1] : 
+              currentTripStart;
+
+            trips.push({
+              startTime: tripStartTime,
+              endTime: tripEndTime,
+              startLat: currentTripStart.lat,
+              startLng: currentTripStart.lng,
+              endLat: endCoord.lat,
+              endLng: endCoord.lng,
+              distance: distance,
+              coordinates: [...currentTripCoords]
+            });
+          }
+
+          // Reset for next trip
+          currentTripStart = null;
+          currentTripCoords = [];
+          tripStartTime = null;
+          lastOdometer = null;
+        } else if (point.isIgnitionOn === true && currentTripStart && hasLocation) {
+          // Trip in progress - add location point
+          currentTripCoords.push({
+            lat: point.lat!,
+            lng: point.lng!,
             timestamp: point.timestamp
-          };
-          currentTripCoords = [currentTripStart];
-        }
-      } else if (point.isIgnitionOn === false && currentTripStart && tripStartTime) {
-        // Trip ends - ignition turned off
-        const tripEndTime = point.timestamp;
-        let distance = 0;
-        
-        // Calculate distance using GPS coordinates if available
-        if (currentTripCoords.length >= 2) {
-          distance = this.calculateTotalDistance(currentTripCoords);
-        } else if (point.odometer !== null && lastOdometer !== null) {
-          // Fallback to odometer reading if GPS data is insufficient
-          distance = (point.odometer - lastOdometer) * 0.621371; // Convert km to miles
-        }
-
-        // Only include trips with meaningful distance (at least 0.1 miles)
-        if (distance >= 0.1) {
-          const endCoord = currentTripCoords.length > 0 ? 
-            currentTripCoords[currentTripCoords.length - 1] : 
-            currentTripStart;
-
-          trips.push({
-            startTime: tripStartTime,
-            endTime: tripEndTime,
-            startLat: currentTripStart.lat,
-            startLng: currentTripStart.lng,
-            endLat: endCoord.lat,
-            endLng: endCoord.lng,
-            distance: distance,
-            coordinates: [...currentTripCoords]
           });
         }
-
-        // Reset for next trip
-        currentTripStart = null;
-        currentTripCoords = [];
-        tripStartTime = null;
-        lastOdometer = null;
-      } else if (point.isIgnitionOn === true && currentTripStart && hasLocation) {
-        // Trip in progress - add location point
-        currentTripCoords.push({
-          lat: point.lat,
-          lng: point.lng,
-          timestamp: point.timestamp
-        });
-      }
     }
 
     return trips;
