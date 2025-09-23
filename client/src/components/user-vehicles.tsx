@@ -44,6 +44,11 @@ interface SharedVehiclesResponse {
   count: number;
 }
 
+interface UserVehiclesProps {
+  onVehicleSelect?: (vehicleId: string) => void;
+  onLocationUpdate?: (data: { lat: number; lng: number; hdop: number; timestamp: string }) => void;
+}
+
 function getCachedToken(): string | null {
   if (typeof window !== 'undefined') {
     return localStorage.getItem("dimo_cached_token");
@@ -118,7 +123,7 @@ const fetchCurrentVehicleHistory = async (tokenId: number) => {
   return response.json();
 };
 
-export default function UserVehicles() {
+export default function UserVehicles({ onVehicleSelect, onLocationUpdate }: UserVehiclesProps = {}) {
   const { isAuthenticated, walletAddress, email, isFromCache } =
     useCachedDimoAuth();
   const { toast } = useToast();
@@ -181,6 +186,16 @@ export default function UserVehicles() {
 
           // Also dispatch event to clear user pins and restore GPS signals
           window.dispatchEvent(new CustomEvent("clearUserPin"));
+        }
+
+        // Call the onLocationUpdate callback if provided
+        if (onLocationUpdate) {
+          onLocationUpdate({
+            lat: locationData.lat,
+            lng: locationData.lng,
+            hdop: locationData.hdop || 1.0,
+            timestamp: new Date().toISOString()
+          });
         }
       } else {
         toast({
@@ -338,8 +353,9 @@ export default function UserVehicles() {
             {vehicles.map((vehicle) => (
               <div
                 key={vehicle.tokenId}
-                className="border rounded-lg p-3 space-y-2"
+                className="border rounded-lg p-3 space-y-2 cursor-pointer hover:bg-muted/50 transition-colors"
                 data-testid={`vehicle-card-${vehicle.tokenId}`}
+                onClick={() => onVehicleSelect?.(vehicle.tokenId.toString())}
               >
                 <div className="flex justify-between items-start">
                   <div>
