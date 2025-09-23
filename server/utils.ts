@@ -174,8 +174,10 @@ export function generateMileageSummary(
   }>,
   month: string
 ) {
-  const monthStart = new Date(month + "-01");
-  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+  // Parse month as YYYY-MM and create proper date range
+  const [year, monthNum] = month.split('-').map(Number);
+  const monthStart = new Date(year, monthNum - 1, 1); // monthNum - 1 because Date months are 0-indexed
+  const monthEnd = new Date(year, monthNum, 0); // Last day of the month
   
   const monthTrips = trips.filter(trip => {
     const tripDate = new Date(trip.startTime);

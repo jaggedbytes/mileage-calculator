@@ -86,6 +86,7 @@ export default function TripDetector() {
     from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0]
   });
+  const [isUpdatingClassification, setIsUpdatingClassification] = useState<string | null>(null);
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -133,16 +134,49 @@ export default function TripDetector() {
     }
   };
 
-  const handleExportCSV = async () => {
-    if (!walletAddress) return;
+  const handleUpdateClassification = async (tripId: string, classification: string) => {
+    setIsUpdatingClassification(tripId);
+    try {
+      const response = await fetch(`/api/trips/${tripId}/classification`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ classification })
+      });
 
-    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
-    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${currentMonth}`;
+      if (!response.ok) {
+        throw new Error(`Failed to update classification: ${response.statusText}`);
+      }
+
+      // Update the local state
+      setDetectedTrips(prev => 
+        prev.map(trip => 
+          trip.id === tripId 
+            ? { ...trip, classification }
+            : trip
+        )
+      );
+    } catch (error) {
+      console.error("Error updating classification:", error);
+      alert(`Failed to update classification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUpdatingClassification(null);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!walletAddress || detectedTrips.length === 0) return;
+
+    // Use the month from the first detected trip instead of current month
+    const firstTripDate = new Date(detectedTrips[0].startTime);
+    const tripMonth = firstTripDate.toISOString().slice(0, 7); // YYYY-MM format
+    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}`;
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
     link.href = url;
-    link.download = `mileage-${currentMonth}.csv`;
+    link.download = `mileage-${tripMonth}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -285,40 +319,78 @@ export default function TripDetector() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {detectedTrips.map((trip) => (
-                <div key={trip.id} className="p-4 border rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{trip.classification}</Badge>
-                      <span className="text-sm text-muted-foreground">
-                        {formatTime(trip.startTime)}
-                      </span>
+                <div className="space-y-3">
+                  {detectedTrips.map((trip) => (
+                    <div key={trip.id} className="p-4 border rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            variant={trip.classification === 'business' ? 'default' : trip.classification === 'personal' ? 'secondary' : 'outline'}
+                          >
+                            {trip.classification}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatTime(trip.startTime)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium">{formatDistance(trip.distance)}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1 mb-1">
+                          <MapPin className="h-3 w-3" />
+                          Start: {trip.startLatitude.toFixed(4)}, {trip.startLongitude.toFixed(4)}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-3 w-3" />
+                          End: {trip.endLatitude.toFixed(4)}, {trip.endLongitude.toFixed(4)}
+                        </div>
+                      </div>
+
+                      {/* Classification Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={trip.classification === 'business' ? 'default' : 'outline'}
+                          onClick={() => handleUpdateClassification(trip.id, 'business')}
+                          disabled={isUpdatingClassification === trip.id}
+                          className="text-xs"
+                        >
+                          {isUpdatingClassification === trip.id ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : null}
+                          Business
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={trip.classification === 'personal' ? 'default' : 'outline'}
+                          onClick={() => handleUpdateClassification(trip.id, 'personal')}
+                          disabled={isUpdatingClassification === trip.id}
+                          className="text-xs"
+                        >
+                          Personal
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={trip.classification === 'other' ? 'default' : 'outline'}
+                          onClick={() => handleUpdateClassification(trip.id, 'other')}
+                          disabled={isUpdatingClassification === trip.id}
+                          className="text-xs"
+                        >
+                          Other
+                        </Button>
+                      </div>
+                      
+                      {trip.notes && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {trip.notes}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium">{formatDistance(trip.distance)}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1 mb-1">
-                      <MapPin className="h-3 w-3" />
-                      Start: {trip.startLatitude.toFixed(4)}, {trip.startLongitude.toFixed(4)}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      End: {trip.endLatitude.toFixed(4)}, {trip.endLongitude.toFixed(4)}
-                    </div>
-                  </div>
-                  
-                  {trip.notes && (
-                    <div className="mt-2 text-xs text-muted-foreground">
-                      {trip.notes}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
       )}

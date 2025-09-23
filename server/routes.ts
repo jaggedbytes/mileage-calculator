@@ -309,8 +309,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Export mileage data as CSV
-  app.get("/api/mileage/export", async (req, res) => {
+    // Update trip classification
+    app.patch("/api/trips/:tripId/classification", async (req, res) => {
+      try {
+        const { tripId } = req.params;
+        const { classification } = req.body;
+        
+        console.log(`Updating trip ${tripId} classification to: ${classification}`);
+        
+        if (!classification || !['business', 'personal', 'other'].includes(classification)) {
+          res.status(400).json({ message: "Invalid classification. Must be 'business', 'personal', or 'other'" });
+          return;
+        }
+        
+        const updatedTrip = await storage.updateTrip(tripId, { classification });
+        
+        if (!updatedTrip) {
+          res.status(404).json({ message: "Trip not found" });
+          return;
+        }
+        
+        console.log(`Successfully updated trip ${tripId} classification to: ${updatedTrip.classification}`);
+        res.json({ message: "Classification updated successfully", trip: updatedTrip });
+      } catch (error) {
+        console.error("Error updating trip classification:", error);
+        res.status(500).json({ message: "Failed to update classification" });
+      }
+    });
+
+    // Export mileage data as CSV
+    app.get("/api/mileage/export", async (req, res) => {
     try {
       const { userId, month } = req.query; // month in YYYY-MM format
       
@@ -319,11 +347,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      // Get all trips for the user
-      const allTrips = await storage.getTripsByUser(userId as string);
+        // Get all trips for the user
+        const allTrips = await storage.getTripsByUser(userId as string);
+        
+        console.log(`Exporting CSV for user ${userId}, month ${month}, found ${allTrips.length} trips`);
+        console.log(`Trip classifications:`, allTrips.map(trip => ({ id: trip.id, classification: trip.classification, startTime: trip.startTime })));
+      
+      // Check if there are any trips
+      if (allTrips.length === 0) {
+        // Return a CSV with just headers and a message
+        const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}-no-data.csv"`);
+        res.send(csvContent);
+        return;
+      }
       
       // Generate monthly summary
       const summary = generateMileageSummary(allTrips, month as string);
+      
+      // Check if there are any trips for the specific month
+      if (Object.keys(summary.dailyBreakdown).length === 0) {
+        // Return a CSV with just headers and a message
+        const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}-no-data.csv"`);
+        res.send(csvContent);
+        return;
+      }
       
       // Create CSV content
       const csvHeader = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\n";
