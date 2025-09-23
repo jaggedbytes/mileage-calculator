@@ -220,3 +220,53 @@ export function generateMileageSummary(
   
   return summary;
 }
+
+/**
+ * Generate mileage summary from trips without month filtering (for date range exports)
+ * @param trips Array of trips
+ * @returns Mileage summary object
+ */
+export function generateMileageSummaryFromTrips(
+  trips: Array<{
+    startTime: string;
+    distance: number;
+    classification: string;
+  }>
+) {
+  const summary = {
+    totalMiles: 0,
+    businessMiles: 0,
+    personalMiles: 0,
+    otherMiles: 0,
+    tripCount: trips.length,
+    dailyBreakdown: {} as Record<string, { business: number, personal: number, other: number, total: number }>
+  };
+  
+  trips.forEach(trip => {
+    const tripDate = new Date(trip.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    if (!summary.dailyBreakdown[tripDate]) {
+      summary.dailyBreakdown[tripDate] = { business: 0, personal: 0, other: 0, total: 0 };
+    }
+    
+    summary.totalMiles += trip.distance;
+    summary.dailyBreakdown[tripDate].total += trip.distance;
+    
+    switch (trip.classification) {
+      case 'business':
+        summary.businessMiles += trip.distance;
+        summary.dailyBreakdown[tripDate].business += trip.distance;
+        break;
+      case 'personal':
+        summary.personalMiles += trip.distance;
+        summary.dailyBreakdown[tripDate].personal += trip.distance;
+        break;
+      default:
+        summary.otherMiles += trip.distance;
+        summary.dailyBreakdown[tripDate].other += trip.distance;
+        break;
+    }
+  });
+  
+  return summary;
+}

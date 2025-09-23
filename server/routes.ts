@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertGpsDataSchema, insertTripSchema } from "@shared/schema";
 import { z } from "zod";
 import { dimoService } from "./dimo-service";
-import { generateMileageSummary } from "./utils";
+import { generateMileageSummary, generateMileageSummaryFromTrips } from "./utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication callback routes
@@ -326,7 +326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Export mileage data as CSV
     app.get("/api/mileage/export", async (req, res) => {
     try {
-      const { userId, month, vehicleId, vehicleInfo, dateRange } = req.query; // month in YYYY-MM format
+      const { userId, month, vehicleId, vehicleInfo, dateRange, excludedTrips } = req.query; // month in YYYY-MM format
       
       if (!userId || !month) {
         res.status(400).json({ message: "userId and month parameters are required" });
@@ -334,7 +334,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
         // Get all trips for the user
-        const allTrips = await storage.getTripsByUser(userId as string);
+        let allTrips = await storage.getTripsByUser(userId as string);
+        
+        // Filter out excluded trips if provided
+        if (excludedTrips && typeof excludedTrips === 'string') {
+          const excludedTripIds = excludedTrips.split(',').filter(id => id.trim() !== '');
+          allTrips = allTrips.filter(trip => !excludedTripIds.includes(trip.id));
+        }
+
+        // If dateRange is provided, filter trips by the actual date range instead of just month
+        if (dateRange && typeof dateRange === 'string') {
+          const [fromDateStr, toDateStr] = dateRange.split('_to_');
+          if (fromDateStr && toDateStr) {
+            const fromDate = new Date(fromDateStr + 'T00:00:00.000Z');
+            const toDate = new Date(toDateStr + 'T23:59:59.999Z');
+            
+            allTrips = allTrips.filter(trip => {
+              const tripDate = new Date(trip.startTime);
+              return tripDate >= fromDate && tripDate <= toDate;
+            });
+          }
+        }
         
       
         // Get vehicle info from URL parameter or fallback to vehicleId
@@ -353,7 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if there are any trips
         if (allTrips.length === 0) {
           // Return a CSV with just headers and a message
-          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this period. Please detect trips first.\n";
           
           res.setHeader('Content-Type', 'text/csv');
           res.setHeader('Content-Disposition', `attachment; filename="mileage${vehicleInfoForFilename}${dateRangeForFilename}-no-data.csv"`);
@@ -361,13 +381,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
       
-      // Generate monthly summary
-      const summary = generateMileageSummary(allTrips, month as string);
+      // Generate summary - use date range filtering if available, otherwise use month
+      let summary;
+      if (dateRange && typeof dateRange === 'string') {
+        // Use the already filtered trips for date range
+        summary = generateMileageSummaryFromTrips(allTrips);
+      } else {
+        // Fall back to month-based filtering
+        summary = generateMileageSummary(allTrips, month as string);
+      }
       
-        // Check if there are any trips for the specific month
+        // Check if there are any trips for the period
         if (Object.keys(summary.dailyBreakdown).length === 0) {
           // Return a CSV with just headers and a message
-          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this period. Please detect trips first.\n";
           
           res.setHeader('Content-Type', 'text/csv');
           res.setHeader('Content-Disposition', `attachment; filename="mileage${vehicleInfoForFilename}${dateRangeForFilename}-no-data.csv"`);
@@ -375,10 +402,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return;
         }
         
-        // Create CSV content
-        const csvHeader = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\n";
-        const csvRows = Object.entries(summary.dailyBreakdown)
-          .map(([date, data]) => `${date},${data.business},${data.personal},${data.other},${data.total}`)
+        // Create CSV content - show individual trips instead of daily aggregations
+        const csvHeader = "Date,Time,Classification,Distance (Miles),Start Location,End Location\n";
+        const csvRows = allTrips
+          .map(trip => {
+            const tripDate = new Date(trip.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
+            const tripTime = new Date(trip.startTime).toLocaleTimeString('en-US', { 
+              hour12: false, 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            const startLoc = `${trip.startLatitude.toFixed(4)}, ${trip.startLongitude.toFixed(4)}`;
+            const endLoc = `${trip.endLatitude.toFixed(4)}, ${trip.endLongitude.toFixed(4)}`;
+            
+            return `${tripDate},${tripTime},${trip.classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}"`;
+          })
           .join('\n');
         
         const csvContent = csvHeader + csvRows;

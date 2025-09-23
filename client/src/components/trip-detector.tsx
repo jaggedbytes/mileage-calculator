@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Car, Download, Play, MapPin, Loader2 } from "lucide-react";
+import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
 import TripMap from "./trip-map";
 
@@ -19,6 +19,7 @@ interface Trip {
   endLatitude: number;
   endLongitude: number;
   coordinates?: Array<{lat: number, lng: number, timestamp: string}>;
+  excludedFromExport?: boolean;
 }
 
 interface Vehicle {
@@ -90,6 +91,7 @@ export default function TripDetector() {
   });
   const [isUpdatingClassification, setIsUpdatingClassification] = useState<string | null>(null);
   const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set());
+  const [excludedTrips, setExcludedTrips] = useState<Set<string>>(new Set());
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -175,8 +177,28 @@ export default function TripDetector() {
     });
   };
 
+  const toggleTripExclusion = (tripId: string) => {
+    setExcludedTrips(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tripId)) {
+        newSet.delete(tripId);
+      } else {
+        newSet.add(tripId);
+      }
+      return newSet;
+    });
+  };
+
   const handleExportCSV = async () => {
     if (!walletAddress || detectedTrips.length === 0 || !selectedVehicle) return;
+
+    // Filter out excluded trips
+    const includedTrips = detectedTrips.filter(trip => !excludedTrips.has(trip.id));
+    
+    if (includedTrips.length === 0) {
+      alert('No trips to export. All trips have been excluded from export.');
+      return;
+    }
 
     // Get vehicle info for filename
     const selectedVehicleData = vehiclesData?.vehicles?.find(v => v.tokenId.toString() === selectedVehicle);
@@ -195,7 +217,9 @@ export default function TripDetector() {
       encodeURIComponent(`${selectedVehicleData.definition.year}-${selectedVehicleData.definition.make}-${selectedVehicleData.definition.model}`) :
       selectedVehicle;
     
-        const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}`;
+    // Pass excluded trip IDs as a parameter
+    const excludedTripIds = Array.from(excludedTrips).join(',');
+    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}&excludedTrips=${encodeURIComponent(excludedTripIds)}`;
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
@@ -337,6 +361,11 @@ export default function TripDetector() {
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
               Detected Trips ({detectedTrips.length})
+              {excludedTrips.size > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {excludedTrips.size} excluded
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Trips automatically detected using ignition signals and GPS data
@@ -345,7 +374,14 @@ export default function TripDetector() {
           <CardContent>
                 <div className="space-y-3">
                   {detectedTrips.map((trip) => (
-                    <div key={trip.id} className="p-4 border rounded-lg">
+                    <div 
+                      key={trip.id} 
+                      className={`p-4 border rounded-lg ${
+                        excludedTrips.has(trip.id) 
+                          ? 'bg-red-50 border-red-200 opacity-75' 
+                          : 'bg-white'
+                      }`}
+                    >
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <Badge 
@@ -404,6 +440,28 @@ export default function TripDetector() {
                           className="text-xs"
                         >
                           Other
+                        </Button>
+                      </div>
+
+                      {/* Exclude from Export Button */}
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          variant={excludedTrips.has(trip.id) ? "destructive" : "outline"}
+                          onClick={() => toggleTripExclusion(trip.id)}
+                          className="text-xs"
+                        >
+                          {excludedTrips.has(trip.id) ? (
+                            <>
+                              <X className="mr-1 h-3 w-3" />
+                              Excluded from Export
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-1 h-3 w-3" />
+                              Include in Export
+                            </>
+                          )}
                         </Button>
                       </div>
 
