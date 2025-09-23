@@ -667,6 +667,57 @@ export class DimoService {
 
     return this.detectVehicleTrips(vehicleId, userId, from, to);
   }
+
+  /**
+   * Get basic vehicle information
+   * @param vehicleId Vehicle token ID
+   * @returns Vehicle information including make, model, year
+   */
+  async getVehicleInfo(vehicleId: string): Promise<{
+    tokenId: number;
+    definition: {
+      year: number;
+      make: string;
+      model: string;
+    };
+  } | null> {
+    try {
+      const jwt = await this.getDeveloperJwt();
+      
+      // Use the same vehicles query as getUserVehicles but filter by tokenId
+      const query = `
+        query GetVehicleInfo($tokenId: Int!) {
+          vehicles(
+            filterBy: { tokenId: $tokenId }
+            first: 1
+          ) {
+            nodes {
+              tokenId
+              definition {
+                year
+                make
+                model
+              }
+            }
+          }
+        }
+      `;
+      
+      const response = await this.dimo.identity.query({
+        query: query,
+        variables: { tokenId: parseInt(vehicleId) }
+      });
+      
+      if (response.data?.vehicles?.nodes?.length > 0) {
+        return response.data.vehicles.nodes[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error fetching vehicle info:", error);
+      return null;
+    }
+  }
 }
 
 export const dimoService = new DimoService();

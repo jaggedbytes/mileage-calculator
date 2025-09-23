@@ -166,17 +166,36 @@ export default function TripDetector() {
   };
 
   const handleExportCSV = async () => {
-    if (!walletAddress || detectedTrips.length === 0) return;
+    if (!walletAddress || detectedTrips.length === 0 || !selectedVehicle) return;
 
-    // Use the month from the first detected trip instead of current month
-    const firstTripDate = new Date(detectedTrips[0].startTime);
-    const tripMonth = firstTripDate.toISOString().slice(0, 7); // YYYY-MM format
-    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}`;
+    // Get vehicle info for filename
+    const selectedVehicleData = vehiclesData?.vehicles?.find(v => v.tokenId.toString() === selectedVehicle);
+    const vehicleInfo = selectedVehicleData ? 
+      `${selectedVehicleData.definition.year}-${selectedVehicleData.definition.make}-${selectedVehicleData.definition.model}`.replace(/\s+/g, '-') :
+      `vehicle-${selectedVehicle}`;
+
+    // Use the selected date range for filename
+    const fromDate = new Date(dateRange.from);
+    const toDate = new Date(dateRange.to);
+    const dateRangeStr = `${fromDate.toISOString().slice(0, 10)}_to_${toDate.toISOString().slice(0, 10)}`;
+    const tripMonth = fromDate.toISOString().slice(0, 7); // YYYY-MM format for backend filtering
+    
+    // Pass vehicle info as URL parameter to avoid server-side API call
+    const vehicleInfoParam = selectedVehicleData ? 
+      encodeURIComponent(`${selectedVehicleData.definition.year}-${selectedVehicleData.definition.make}-${selectedVehicleData.definition.model}`) :
+      selectedVehicle;
+    
+    const url = `/api/mileage/export?userId=${encodeURIComponent(walletAddress)}&month=${tripMonth}&vehicleId=${selectedVehicle}&vehicleInfo=${vehicleInfoParam}&dateRange=${encodeURIComponent(dateRangeStr)}`;
+    
+    console.log('CSV Export URL:', url);
+    console.log('Vehicle info param:', vehicleInfoParam);
+    console.log('Date range:', dateRangeStr);
+    console.log('Selected vehicle data:', selectedVehicleData);
     
     // Create a temporary link to trigger download
     const link = document.createElement('a');
     link.href = url;
-    link.download = `mileage-${tripMonth}.csv`;
+    link.download = `mileage-${vehicleInfo}-${dateRangeStr}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

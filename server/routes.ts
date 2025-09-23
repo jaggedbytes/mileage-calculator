@@ -340,7 +340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Export mileage data as CSV
     app.get("/api/mileage/export", async (req, res) => {
     try {
-      const { userId, month } = req.query; // month in YYYY-MM format
+      const { userId, month, vehicleId, vehicleInfo, dateRange } = req.query; // month in YYYY-MM format
       
       if (!userId || !month) {
         res.status(400).json({ message: "userId and month parameters are required" });
@@ -352,45 +352,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`Exporting CSV for user ${userId}, month ${month}, found ${allTrips.length} trips`);
         console.log(`Trip classifications:`, allTrips.map(trip => ({ id: trip.id, classification: trip.classification, startTime: trip.startTime })));
+        console.log(`Query parameters:`, { userId, month, vehicleId, vehicleInfo });
       
-      // Check if there are any trips
-      if (allTrips.length === 0) {
-        // Return a CSV with just headers and a message
-        const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
-        
-        res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}-no-data.csv"`);
-        res.send(csvContent);
-        return;
-      }
+        // Get vehicle info from URL parameter or fallback to vehicleId
+        let vehicleInfoForFilename = "";
+        if (vehicleInfo) {
+          // Use the vehicle info passed from frontend
+          vehicleInfoForFilename = `-${(vehicleInfo as string).replace(/\s+/g, '-')}`;
+        } else if (vehicleId) {
+          // Fallback to vehicle ID if no vehicle info provided
+          vehicleInfoForFilename = `-vehicle-${vehicleId}`;
+        }
+
+        // Use date range for filename if provided, otherwise fallback to month
+        const dateRangeForFilename = dateRange ? `-${dateRange}` : `-${month}`;
+
+        // Check if there are any trips
+        if (allTrips.length === 0) {
+          // Return a CSV with just headers and a message
+          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+          
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="mileage${vehicleInfoForFilename}${dateRangeForFilename}-no-data.csv"`);
+          res.send(csvContent);
+          return;
+        }
       
       // Generate monthly summary
       const summary = generateMileageSummary(allTrips, month as string);
       
-      // Check if there are any trips for the specific month
-      if (Object.keys(summary.dailyBreakdown).length === 0) {
-        // Return a CSV with just headers and a message
-        const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+        // Check if there are any trips for the specific month
+        if (Object.keys(summary.dailyBreakdown).length === 0) {
+          // Return a CSV with just headers and a message
+          const csvContent = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\nNo trips found for this month. Please detect trips first.\n";
+          
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="mileage${vehicleInfoForFilename}${dateRangeForFilename}-no-data.csv"`);
+          res.send(csvContent);
+          return;
+        }
         
+        // Create CSV content
+        const csvHeader = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\n";
+        const csvRows = Object.entries(summary.dailyBreakdown)
+          .map(([date, data]) => `${date},${data.business},${data.personal},${data.other},${data.total}`)
+          .join('\n');
+        
+        const csvContent = csvHeader + csvRows;
+        
+        // Set headers for CSV download
         res.setHeader('Content-Type', 'text/csv');
-        res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}-no-data.csv"`);
+        res.setHeader('Content-Disposition', `attachment; filename="mileage${vehicleInfoForFilename}${dateRangeForFilename}.csv"`);
+        
         res.send(csvContent);
-        return;
-      }
-      
-      // Create CSV content
-      const csvHeader = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\n";
-      const csvRows = Object.entries(summary.dailyBreakdown)
-        .map(([date, data]) => `${date},${data.business},${data.personal},${data.other},${data.total}`)
-        .join('\n');
-      
-      const csvContent = csvHeader + csvRows;
-      
-      // Set headers for CSV download
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}.csv"`);
-      
-      res.send(csvContent);
     } catch (error) {
       console.error("Error exporting mileage data:", error);
       res.status(500).json({ message: "Failed to export mileage data" });
