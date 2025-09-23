@@ -206,8 +206,8 @@ export default function TripDetector() {
         },
         body: JSON.stringify({
           userId: walletAddress,
-          from: new Date(dateRange.from).toISOString(),
-          to: new Date(dateRange.to).toISOString()
+          from: new Date(dateRange.from).toISOString(), // Start of day (00:00:00)
+          to: new Date(dateRange.to + 'T23:59:59.999Z').toISOString() // End of day (23:59:59.999)
         })
       });
 
