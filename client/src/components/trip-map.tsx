@@ -37,6 +37,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
   const startMarkerRef = useRef<L.Marker | null>(null);
   const endMarkerRef = useRef<L.Marker | null>(null);
 
+  // Initialize map only when expanded
   useEffect(() => {
     if (!mapRef.current || !isExpanded) return;
 
@@ -122,7 +123,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
         mapInstanceRef.current = null;
       }
     };
-  }, [trip, isExpanded]);
+  }, [isExpanded]); // Only depend on isExpanded, not the entire trip object
 
   return (
     <div className="mt-3">
