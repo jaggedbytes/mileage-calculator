@@ -270,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fromDate = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const toDate = to || new Date().toISOString();
 
-      // Detect trips using ignition signals
+      // Detect trips using ignition signals (with location fallback)
       const detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
       
       // Save trips to storage
@@ -278,13 +278,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         detectedTrips.map(trip => storage.createTrip(trip))
       );
       
+      // Determine actual detection method based on trip notes
+      const detectionMethod = savedTrips.length > 0 && savedTrips[0].notes 
+        ? (savedTrips[0].notes.includes('ignition') ? 'ignition' : 'location')
+        : 'unknown';
+      
       res.json({
-        message: `Successfully detected ${savedTrips.length} trips using ignition signals`,
+        message: `Successfully detected ${savedTrips.length} trips using ${detectionMethod} signals`,
         trips: savedTrips,
         vehicleId,
         from: fromDate,
         to: toDate,
-        detectionMethod: "ignition"
+        detectionMethod
       });
     } catch (error) {
       console.error("Error detecting trips:", error);

@@ -144,11 +144,20 @@ export default function TripDetector() {
       if (firstTrip.notes) {
         const firstData = JSON.parse(firstTrip.notes);
         if (firstData.coordinates && firstData.coordinates.length > 0) {
-          // Find the first coordinate that has odometer data (not just the first coordinate)
-          const coordsWithOdometer = firstData.coordinates.filter((c: any) => c.odometer !== null && c.odometer !== undefined);
+          const firstTripStartTime = new Date(firstTrip.startTime).getTime();
+          
+          // Find coordinate closest to trip start time that has odometer data
+          const coordsWithOdometer = firstData.coordinates
+            .filter((c: any) => c.odometer !== null && c.odometer !== undefined)
+            .map((c: any) => ({
+              ...c,
+              timeDiff: Math.abs(new Date(c.timestamp).getTime() - firstTripStartTime)
+            }))
+            .sort((a: any, b: any) => a.timeDiff - b.timeDiff);
+            
           if (coordsWithOdometer.length > 0) {
-            const firstCoordWithOdometer = coordsWithOdometer[0];
-            startOdometer = firstCoordWithOdometer.odometer;
+            const closestCoord = coordsWithOdometer[0];
+            startOdometer = closestCoord.odometer;
           }
         }
       }
@@ -156,11 +165,20 @@ export default function TripDetector() {
       if (lastTrip.notes) {
         const lastData = JSON.parse(lastTrip.notes);
         if (lastData.coordinates && lastData.coordinates.length > 0) {
-          // Find the last coordinate that has odometer data (not just the last coordinate)
-          const coordsWithOdometer = lastData.coordinates.filter((c: any) => c.odometer !== null && c.odometer !== undefined);
+          const lastTripEndTime = new Date(lastTrip.endTime).getTime();
+          
+          // Find coordinate closest to trip end time that has odometer data
+          const coordsWithOdometer = lastData.coordinates
+            .filter((c: any) => c.odometer !== null && c.odometer !== undefined)
+            .map((c: any) => ({
+              ...c,
+              timeDiff: Math.abs(new Date(c.timestamp).getTime() - lastTripEndTime)
+            }))
+            .sort((a: any, b: any) => a.timeDiff - b.timeDiff);
+            
           if (coordsWithOdometer.length > 0) {
-            const lastCoordWithOdometer = coordsWithOdometer[coordsWithOdometer.length - 1];
-            endOdometer = lastCoordWithOdometer.odometer;
+            const closestCoord = coordsWithOdometer[0];
+            endOdometer = closestCoord.odometer;
           }
         }
       }
@@ -468,9 +486,13 @@ export default function TripDetector() {
                 {detectionResult.message}
               </p>
               <p className="text-xs text-green-600 mt-1">
-                Detection method: {detectionResult.detectionMethod} | 
+                Detection method: {detectionResult.detectionMethod.charAt(0).toUpperCase() + detectionResult.detectionMethod.slice(1)} | 
                 Date range: {new Date(detectionResult.from).toLocaleDateString()} - {new Date(detectionResult.to).toLocaleDateString()}
               </p>
+              <div className="mt-2 text-xs text-gray-600">
+                <p><strong>Ignition:</strong> Uses vehicle ignition on/off signals for precise trip detection</p>
+                <p><strong>Location:</strong> Uses GPS coordinates and movement patterns when ignition data is unavailable</p>
+              </div>
             </div>
           )}
         </CardContent>
@@ -511,16 +533,30 @@ export default function TripDetector() {
                     </div>
                   </div>
                 </div>
-                {odometerData.start !== null && odometerData.end !== null && (
-                  <div className="mt-4 text-center">
-                    <div className="text-lg font-semibold text-gray-700">
+              {odometerData.start !== null && odometerData.end !== null && (
+                <div className="mt-4 space-y-2">
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-green-700">
                       Total Distance: {(odometerData.end - odometerData.start).toLocaleString()} km
                     </div>
-                    <div className="text-sm text-gray-500">
-                      ({((odometerData.end - odometerData.start) * 0.621371).toFixed(1)} miles)
+                    <div className="text-sm text-green-600">
+                      ({((odometerData.end - odometerData.start) * 0.621371).toFixed(1)} miles) - Vehicle Odometer
                     </div>
                   </div>
-                )}
+                  <div className="text-center">
+                    <div className="text-lg font-semibold text-gray-500">
+                      GPS Distance: {detectedTrips.reduce((sum, trip) => sum + trip.distance, 0).toFixed(2)} miles
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      (Sum of GPS-calculated trips)
+                    </div>
+                  </div>
+                  <div className="text-center text-xs text-gray-500">
+                    <p>Vehicle odometer readings are more accurate than GPS calculations</p>
+                    <p>GPS accuracy can vary due to HDOP and coordinate density</p>
+                  </div>
+                </div>
+              )}
               </CardContent>
             </Card>
           )}
