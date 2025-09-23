@@ -455,14 +455,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const odometerUnit = useKm ? 'km' : 'mi';
         
         // Create CSV content - show individual trips with odometer column
-        const csvHeader = `Date,Time,Classification,Distance (${distanceUnit}),Odometer (${odometerUnit}),Start Location,End Location,Notes\n`;
+        const csvHeader = `Date,Start Time,End Time,Duration,Classification,Distance (${distanceUnit}),Odometer (${odometerUnit}),Start Location,End Location,Notes\n`;
         
         const csvRows = allTrips
           .map(trip => {
             const tripDate = new Date(trip.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
-            const tripTime = new Date(trip.startTime).toLocaleTimeString('en-US', { 
-              hour12: false, 
-              hour: '2-digit', 
+            const startTime = new Date(trip.startTime).toLocaleTimeString('en-US', { 
+              hour12: true, 
+              hour: 'numeric', 
+              minute: '2-digit' 
+            });
+            const endTime = new Date(trip.endTime).toLocaleTimeString('en-US', { 
+              hour12: true, 
+              hour: 'numeric', 
               minute: '2-digit' 
             });
             const startLoc = `${trip.startLatitude.toFixed(4)}, ${trip.startLongitude.toFixed(4)}`;
@@ -495,8 +500,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
               (trip.distance * 1.60934).toFixed(2) : 
               trip.distance.toFixed(2);
             
+            // Calculate duration
+            const start = new Date(trip.startTime);
+            const end = new Date(trip.endTime);
+            const durationMs = end.getTime() - start.getTime();
+            const durationMinutes = Math.round(durationMs / (1000 * 60));
+            let duration = '';
+            if (durationMinutes < 60) {
+              duration = `${durationMinutes}m`;
+            } else {
+              const hours = Math.floor(durationMinutes / 60);
+              const minutes = durationMinutes % 60;
+              duration = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+            }
+            
             const classification = trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1);
-            return `${tripDate},${tripTime},${classification},${tripDistance},${odometerReading},"${startLoc}","${endLoc}","${notes}"`;
+            return `${tripDate},${startTime},${endTime},${duration},${classification},${tripDistance},${odometerReading},"${startLoc}","${endLoc}","${notes}"`;
           })
           .join('\n');
         

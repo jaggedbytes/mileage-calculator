@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check, Edit3, Save, X as XIcon } from "lucide-react";
+import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check, Edit3, Save, X as XIcon, Clock } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
 import TripMap from "./trip-map";
 
@@ -387,9 +387,36 @@ export default function TripDetector() {
     }
   };
 
+  const formatDuration = (startTime: string, endTime: string) => {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    const durationMs = end.getTime() - start.getTime();
+    const durationMinutes = Math.round(durationMs / (1000 * 60));
+    
+    if (durationMinutes < 60) {
+      return `${durationMinutes}m`;
+    } else {
+      const hours = Math.floor(durationMinutes / 60);
+      const minutes = durationMinutes % 60;
+      return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    }
+  };
 
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString();
+
+  const formatDate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleString('en-US', {
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  const formatTimeOnly = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   if (!isAuthenticated) {
@@ -642,21 +669,28 @@ export default function TripDetector() {
                           : 'bg-white'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Badge 
-                            variant={trip.classification === 'business' ? 'default' : trip.classification === 'personal' ? 'secondary' : 'outline'}
-                          >
-                            {trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1)}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {formatTime(trip.startTime)}
-                          </span>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-start gap-2">
+                            <Badge 
+                              variant={trip.classification === 'business' ? 'default' : trip.classification === 'personal' ? 'secondary' : 'outline'}
+                            >
+                              {trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1)}
+                            </Badge>
+                            <div className="text-sm text-muted-foreground">
+                              <div>{formatDate(trip.startTime)}</div>
+                              <div className="text-xs">
+                                {formatTimeOnly(trip.startTime)} - {formatTimeOnly(trip.endTime)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{formatDistance(trip.distance)}</div>
+                            <div className="text-xs text-muted-foreground flex justify-end gap-1">
+                              <Clock className="h-3 w-3" />
+                              {formatDuration(trip.startTime, trip.endTime)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-medium">{formatDistance(trip.distance)}</div>
-                        </div>
-                      </div>
                       
                       <div className="text-sm text-muted-foreground mb-3">
                         <div className="flex items-center gap-1 mb-1">
