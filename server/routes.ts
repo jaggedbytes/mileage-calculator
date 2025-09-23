@@ -270,18 +270,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fromDate = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const toDate = to || new Date().toISOString();
 
-      // Detect trips using ignition signals (with location fallback)
-      const detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
+      // Check if vehicle supports ignition signals first
+      const ignitionSupported = await dimoService.isIgnitionSupported(vehicleId);
+      
+      let detectedTrips;
+      let detectionMethod;
+      
+      if (ignitionSupported) {
+        // Use ignition-based detection for better accuracy
+        detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
+        detectionMethod = "ignition";
+      } else {
+        // Skip ignition detection and go straight to location-based
+        console.log(`Vehicle ${vehicleId} does not support ignition signals at this time, using location-based detection`);
+        detectedTrips = await dimoService.detectVehicleTripsFromLocation(vehicleId, userId, fromDate, toDate);
+        detectionMethod = "location";
+      }
       
       // Save trips to storage
       const savedTrips = await Promise.all(
         detectedTrips.map(trip => storage.createTrip(trip))
       );
-      
-      // Determine actual detection method based on trip notes
-      const detectionMethod = savedTrips.length > 0 && savedTrips[0].notes 
-        ? (savedTrips[0].notes.includes('ignition') ? 'ignition' : 'location')
-        : 'unknown';
       
       res.json({
         message: `Successfully detected ${savedTrips.length} trips using ${detectionMethod} signals`,

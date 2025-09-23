@@ -335,6 +335,10 @@ export class DimoService {
    * @param to End date in ISO format
    * @returns Array of detected trips ready for storage
    */
+  /**
+   * Detect trips using ONLY ignition signals
+   * This method assumes ignition data is available and supported
+   */
   async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
     try {
       // Fetch ignition and location data with higher frequency for accuracy
@@ -344,14 +348,7 @@ export class DimoService {
         return [];
       }
 
-      // Check if we have any ignition data (non-null isIgnitionOn values)
-      const hasIgnitionData = ignitionData.some(point => point.isIgnitionOn !== null);
-      
-      if (!hasIgnitionData) {
-        return this.detectVehicleTripsFromLocation(vehicleId, userId, from, to, ignitionData);
-      }
-
-      // Detect trips using ignition signals
+      // Detect trips using ignition signals only
       const detectedTrips = this.detectTripsFromIgnition(ignitionData);
 
       // Convert to InsertTrip format
@@ -515,8 +512,14 @@ export class DimoService {
   /**
    * Fallback trip detection using location data when ignition data is not available
    */
-  private async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData: any[]): Promise<InsertTrip[]> {
+  async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData?: any[]): Promise<InsertTrip[]> {
     try {
+      // If no location data provided, fetch it using the same method as ignition detection
+      // This ensures we get odometer data (powertrainTransmissionTravelledDistance)
+      if (!locationData) {
+        locationData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1s");
+      }
+      
       // Filter out points without location data
       const validLocationData = locationData.filter(point => 
         point.lat !== null && point.lng !== null && point.timestamp
@@ -780,6 +783,42 @@ export class DimoService {
    * @param vehicleId Vehicle token ID
    * @returns Vehicle information including make, model, year
    */
+  /**
+   * Check if a vehicle supports ignition signals before making full queries
+   * @param vehicleId DIMO vehicle token ID
+   * @returns Promise<boolean> indicating if ignition signals are available
+   */
+  async isIgnitionSupported(vehicleId: string): Promise<boolean> {
+    try {
+      const tokenId = parseInt(vehicleId);
+      const developerJwt = await this.getDeveloperJwt();
+      const vehicleJwt = await this.getVehicleJwt(developerJwt, tokenId);
+
+      // Query for latest snapshot to check if ignition signals are available
+      const query = `
+        {
+          signalsLatest(tokenId: ${tokenId}) {
+            isIgnitionOn {
+              value
+              timestamp
+            }
+          }
+        }
+      `;
+
+      const response = await this.dimo.telemetry.query({
+        ...vehicleJwt,
+        query: query,
+      });
+
+      const signalsLatest = response?.data?.signalsLatest;
+      return !!(signalsLatest?.isIgnitionOn?.value !== null && signalsLatest?.isIgnitionOn?.value !== undefined);
+    } catch (error) {
+      console.error("Error checking ignition support:", error);
+      return false;
+    }
+  }
+
   async getVehicleInfo(vehicleId: string): Promise<{
     tokenId: number;
     definition: {

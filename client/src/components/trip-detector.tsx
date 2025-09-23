@@ -129,7 +129,10 @@ export default function TripDetector() {
 
   // Extract odometer data from trip detection response
   const extractOdometerData = (trips: Trip[]) => {
-    if (trips.length === 0) return;
+    if (trips.length === 0) {
+      setOdometerData(null);
+      return;
+    }
     
     // Get the first and last trip to determine odometer range
     const sortedTrips = trips.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -143,6 +146,7 @@ export default function TripDetector() {
     try {
       if (firstTrip.notes) {
         const firstData = JSON.parse(firstTrip.notes);
+        
         if (firstData.coordinates && firstData.coordinates.length > 0) {
           const firstTripStartTime = new Date(firstTrip.startTime).getTime();
           
@@ -164,6 +168,7 @@ export default function TripDetector() {
       
       if (lastTrip.notes) {
         const lastData = JSON.parse(lastTrip.notes);
+        
         if (lastData.coordinates && lastData.coordinates.length > 0) {
           const lastTripEndTime = new Date(lastTrip.endTime).getTime();
           
