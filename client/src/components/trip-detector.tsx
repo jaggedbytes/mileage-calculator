@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check } from "lucide-react";
+import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check, Edit3, Save, X as XIcon } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
 import TripMap from "./trip-map";
 
@@ -14,6 +14,7 @@ interface Trip {
   distance: number;
   classification: string;
   notes: string;
+  userNotes?: string;
   startLatitude: number;
   startLongitude: number;
   endLatitude: number;
@@ -92,6 +93,8 @@ export default function TripDetector() {
   const [isUpdatingClassification, setIsUpdatingClassification] = useState<string | null>(null);
   const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set());
   const [excludedTrips, setExcludedTrips] = useState<Set<string>>(new Set());
+  const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [tripNotes, setTripNotes] = useState<Record<string, string>>({});
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -194,6 +197,52 @@ export default function TripDetector() {
         newSet.add(tripId);
       }
       return newSet;
+    });
+  };
+
+  const handleEditNotes = (tripId: string) => {
+    setEditingNotes(tripId);
+  };
+
+  const handleSaveNotes = async (tripId: string) => {
+    const notes = tripNotes[tripId] || '';
+    
+    try {
+      const response = await fetch(`/api/trips/${tripId}/notes`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userNotes: notes })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update notes: ${response.statusText}`);
+      }
+
+      // Update the local state
+      setDetectedTrips(prev => 
+        prev.map(trip => 
+          trip.id === tripId 
+            ? { ...trip, userNotes: notes }
+            : trip
+        )
+      );
+      
+      setEditingNotes(null);
+    } catch (error) {
+      console.error("Error updating notes:", error);
+      alert(`Failed to update notes: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleCancelNotes = (tripId: string) => {
+    setEditingNotes(null);
+    // Reset to original notes
+    setTripNotes(prev => {
+      const updated = { ...prev };
+      delete updated[tripId];
+      return updated;
     });
   };
 
@@ -471,6 +520,59 @@ export default function TripDetector() {
                             </>
                           )}
                         </Button>
+                      </div>
+
+                      {/* Trip Notes */}
+                      <div className="mt-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="text-sm font-medium">Notes</label>
+                          {editingNotes !== trip.id && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditNotes(trip.id)}
+                              className="text-xs h-6 px-2"
+                            >
+                              <Edit3 className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                          )}
+                        </div>
+                        
+                        {editingNotes === trip.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={tripNotes[trip.id] || trip.userNotes || ''}
+                              onChange={(e) => setTripNotes(prev => ({ ...prev, [trip.id]: e.target.value }))}
+                              placeholder="Add notes about this trip..."
+                              className="w-full p-4 text-sm border rounded-sm resize-none"
+                              rows={2}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveNotes(trip.id)}
+                                className="text-xs h-6 px-2"
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCancelNotes(trip.id)}
+                                className="text-xs h-6 px-2"
+                              >
+                                <XIcon className="h-3 w-3 mr-1" />
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground min-h-[2rem] p-4 border rounded-sm bg-muted/50">
+                            {trip.userNotes || 'No notes added'}
+                          </div>
+                        )}
                       </div>
 
                       {/* Trip Map */}

@@ -323,6 +323,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     });
 
+    // Update trip notes
+    app.patch("/api/trips/:tripId/notes", async (req, res) => {
+      try {
+        const { tripId } = req.params;
+        const { userNotes } = req.body;
+        
+        if (userNotes === undefined) {
+          res.status(400).json({ message: "userNotes is required" });
+          return;
+        }
+        
+        const updatedTrip = await storage.updateTrip(tripId, { userNotes: userNotes || '' });
+        
+        if (!updatedTrip) {
+          res.status(404).json({ message: "Trip not found" });
+          return;
+        }
+        
+        res.json({ message: "Notes updated successfully", trip: updatedTrip });
+      } catch (error) {
+        console.error("Error updating trip notes:", error);
+        res.status(500).json({ message: "Failed to update notes" });
+      }
+    });
+
     // Export mileage data as CSV
     app.get("/api/mileage/export", async (req, res) => {
     try {
@@ -403,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Create CSV content - show individual trips instead of daily aggregations
-        const csvHeader = "Date,Time,Classification,Distance (Miles),Start Location,End Location\n";
+        const csvHeader = "Date,Time,Classification,Distance (Miles),Start Location,End Location,Notes\n";
         const csvRows = allTrips
           .map(trip => {
             const tripDate = new Date(trip.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
@@ -414,8 +439,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
             const startLoc = `${trip.startLatitude.toFixed(4)}, ${trip.startLongitude.toFixed(4)}`;
             const endLoc = `${trip.endLatitude.toFixed(4)}, ${trip.endLongitude.toFixed(4)}`;
+            const notes = (trip.userNotes || '').replace(/"/g, '""'); // Escape quotes for CSV
             
-            return `${tripDate},${tripTime},${trip.classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}"`;
+            return `${tripDate},${tripTime},${trip.classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}","${notes}"`;
           })
           .join('\n');
         

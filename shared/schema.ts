@@ -30,6 +30,7 @@ export const trips = pgTable("trips", {
   distance: real("distance").notNull(), // distance in miles
   classification: text("classification").notNull().default("personal"), // business, personal, other
   notes: text("notes"),
+  userNotes: text("user_notes"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -68,6 +69,7 @@ export const insertTripSchema = createInsertSchema(trips).pick({
   distance: true,
   classification: true,
   notes: true,
+  userNotes: true,
 }).extend({
   classification: z.enum(["business", "personal", "other"]).default("personal"),
 });
