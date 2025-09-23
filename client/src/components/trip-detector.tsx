@@ -98,6 +98,7 @@ export default function TripDetector() {
   const [showStickyExport, setShowStickyExport] = useState(false);
   const [odometerData, setOdometerData] = useState<{start: number | null, end: number | null} | null>(null);
   const [useKilometers, setUseKilometers] = useState(false);
+  const [dataInterval, setDataInterval] = useState("1s");
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -208,7 +209,8 @@ export default function TripDetector() {
         body: JSON.stringify({
           userId: walletAddress,
           from: new Date(dateRange.from).toISOString(), // Start of day (00:00:00)
-          to: new Date(dateRange.to + 'T23:59:59.999Z').toISOString() // End of day (23:59:59.999)
+          to: new Date(dateRange.to + 'T23:59:59.999Z').toISOString(), // End of day (23:59:59.999)
+          interval: dataInterval
         })
       });
 
@@ -480,7 +482,7 @@ export default function TripDetector() {
             </div>
             <div>
               <label className="text-sm font-medium">Date Range</label>
-              <div className="flex gap-2 mt-1">
+              <div className="flex flex-wrap gap-2 mt-1">
                 <input
                   type="date"
                   value={dateRange.from}
@@ -499,7 +501,7 @@ export default function TripDetector() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             {/* Distance Unit Toggle */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Distance Units:</span>
@@ -526,7 +528,25 @@ export default function TripDetector() {
                 </button>
               </div>
             </div>
-            
+
+            {/* Data Interval Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Data Interval:</span>
+              <select
+                value={dataInterval}
+                onChange={(e) => setDataInterval(e.target.value)}
+                className="px-3 py-1 text-xs bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="300ms">300ms</option>
+                <option value="1s">1s</option>
+                <option value="5s">5s</option>
+                <option value="30s">30s</option>
+                <option value="1m">1m</option>
+              </select>
+            </div>     
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
             <Button
               onClick={handleDetectTrips}
               disabled={!selectedVehicle || isDetecting}
@@ -670,7 +690,7 @@ export default function TripDetector() {
                       }`}
                     >
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-start gap-2">
+                          <div className="flex flex-col items-start gap-2">
                             <Badge 
                               variant={trip.classification === 'business' ? 'default' : trip.classification === 'personal' ? 'secondary' : 'outline'}
                             >
@@ -703,8 +723,33 @@ export default function TripDetector() {
                         </div>
                       </div>
 
-                      {/* Classification Buttons */}
-                      <div className="flex gap-2">
+                      {/* Exclude from Export Button */}
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          variant={excludedTrips.has(trip.id) ? "destructive" : "outline"}
+                          onClick={() => toggleTripExclusion(trip.id)}
+                          className="text-xs"
+                        >
+                          {excludedTrips.has(trip.id) ? (
+                            <>
+                              <X className="mr-1 h-3 w-3" />
+                              Excluded from Export
+                            </>
+                          ) : (
+                            <>
+                              <Check className="mr-1 h-3 w-3" />
+                              Included in Export
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {/* Category Buttons */}
+                      <div className="flex flex-wrap gap-2">
+                        <div className="mt-2 text-xs text-gray-600 w-full">
+                          <p><strong>Category</strong></p>
+                        </div>
                         <Button
                           size="sm"
                           variant={trip.classification === 'business' ? 'default' : 'outline'}
@@ -734,28 +779,6 @@ export default function TripDetector() {
                           className="text-xs"
                         >
                           Other
-                        </Button>
-                      </div>
-
-                      {/* Exclude from Export Button */}
-                      <div className="mt-2">
-                        <Button
-                          size="sm"
-                          variant={excludedTrips.has(trip.id) ? "destructive" : "outline"}
-                          onClick={() => toggleTripExclusion(trip.id)}
-                          className="text-xs"
-                        >
-                          {excludedTrips.has(trip.id) ? (
-                            <>
-                              <X className="mr-1 h-3 w-3" />
-                              Excluded from Export
-                            </>
-                          ) : (
-                            <>
-                              <Check className="mr-1 h-3 w-3" />
-                              Include in Export
-                            </>
-                          )}
                         </Button>
                       </div>
 

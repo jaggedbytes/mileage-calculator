@@ -339,10 +339,10 @@ export class DimoService {
    * Detect trips using ONLY ignition signals
    * This method assumes ignition data is available and supported
    */
-  async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
+  async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string, interval: string = "1s"): Promise<InsertTrip[]> {
     try {
-      // Fetch ignition and location data with higher frequency for accuracy
-      const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1s");
+      // Fetch ignition and location data with specified interval
+      const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, interval);
 
       if (ignitionData.length < 2) {
         return [];
@@ -512,12 +512,12 @@ export class DimoService {
   /**
    * Fallback trip detection using location data when ignition data is not available
    */
-  async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData?: any[]): Promise<InsertTrip[]> {
+  async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, interval: string = "1s", locationData?: any[]): Promise<InsertTrip[]> {
     try {
       // If no location data provided, fetch it using the same method as ignition detection
       // This ensures we get odometer data (powertrainTransmissionTravelledDistance)
       if (!locationData) {
-        locationData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1s");
+        locationData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, interval);
       }
       
       // Filter out points without location data
@@ -729,8 +729,6 @@ export class DimoService {
         console.log(`Insufficient location data for trip detection: ${locationHistory.length} points`);
         return [];
       }
-
-      console.log(`Processing ${locationHistory.length} location points for trip detection`);
 
       // Detect trips using the utility function
       const detectedTrips = detectTrips(locationHistory, 0.5, 15); // 0.5 mile minimum, 15 minute stops

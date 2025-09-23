@@ -259,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/trips/detect/:vehicleId", async (req, res) => {
     try {
       const { vehicleId } = req.params;
-      const { userId, from, to } = req.body;
+      const { userId, from, to, interval = "1s" } = req.body;
       
       if (!userId) {
         res.status(400).json({ message: "userId is required" });
@@ -278,12 +278,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (ignitionSupported) {
         // Use ignition-based detection for better accuracy
-        detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
+        detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate, interval);
         detectionMethod = "ignition";
       } else {
         // Skip ignition detection and go straight to location-based
         console.log(`Vehicle ${vehicleId} does not support ignition signals at this time, using location-based detection`);
-        detectedTrips = await dimoService.detectVehicleTripsFromLocation(vehicleId, userId, fromDate, toDate);
+        detectedTrips = await dimoService.detectVehicleTripsFromLocation(vehicleId, userId, fromDate, toDate, interval);
         detectionMethod = "location";
       }
       
@@ -455,7 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const odometerUnit = useKm ? 'km' : 'mi';
         
         // Create CSV content - show individual trips with odometer column
-        const csvHeader = `Date,Start Time,End Time,Duration,Classification,Distance (${distanceUnit}),Odometer (${odometerUnit}),Start Location,End Location,Notes\n`;
+        const csvHeader = `Date,Start Time,End Time,Duration,Category,Distance (${distanceUnit}),Odometer (${odometerUnit}),Start Location,End Location,Notes\n`;
         
         const csvRows = allTrips
           .map(trip => {
