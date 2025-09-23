@@ -96,6 +96,7 @@ export default function TripDetector() {
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [tripNotes, setTripNotes] = useState<Record<string, string>>({});
   const [showStickyExport, setShowStickyExport] = useState(false);
+  const [odometerData, setOdometerData] = useState<{start: number | null, end: number | null} | null>(null);
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -126,6 +127,50 @@ export default function TripDetector() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [detectedTrips]);
 
+  // Extract odometer data from trip detection response
+  const extractOdometerData = (trips: Trip[]) => {
+    if (trips.length === 0) return;
+    
+    // Get the first and last trip to determine odometer range
+    const sortedTrips = trips.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    const firstTrip = sortedTrips[0];
+    const lastTrip = sortedTrips[sortedTrips.length - 1];
+    
+    // Try to extract odometer from trip notes (where we store the raw data)
+    let startOdometer = null;
+    let endOdometer = null;
+    
+    try {
+      if (firstTrip.notes) {
+        const firstData = JSON.parse(firstTrip.notes);
+        if (firstData.coordinates && firstData.coordinates.length > 0) {
+          // Find the first coordinate that has odometer data (not just the first coordinate)
+          const coordsWithOdometer = firstData.coordinates.filter((c: any) => c.odometer !== null && c.odometer !== undefined);
+          if (coordsWithOdometer.length > 0) {
+            const firstCoordWithOdometer = coordsWithOdometer[0];
+            startOdometer = firstCoordWithOdometer.odometer;
+          }
+        }
+      }
+      
+      if (lastTrip.notes) {
+        const lastData = JSON.parse(lastTrip.notes);
+        if (lastData.coordinates && lastData.coordinates.length > 0) {
+          // Find the last coordinate that has odometer data (not just the last coordinate)
+          const coordsWithOdometer = lastData.coordinates.filter((c: any) => c.odometer !== null && c.odometer !== undefined);
+          if (coordsWithOdometer.length > 0) {
+            const lastCoordWithOdometer = coordsWithOdometer[coordsWithOdometer.length - 1];
+            endOdometer = lastCoordWithOdometer.odometer;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing odometer data from trips:', error);
+    }
+    
+    setOdometerData({ start: startOdometer, end: endOdometer });
+  };
+
   const handleDetectTrips = async () => {
     if (!selectedVehicle || !walletAddress) return;
 
@@ -152,6 +197,9 @@ export default function TripDetector() {
           const result: TripDetectionResponse = await response.json();
           setDetectedTrips(result.trips);
           setDetectionResult(result);
+          
+          // Extract odometer data from the detected trips
+          extractOdometerData(result.trips);
     } catch (error) {
       console.error("Error detecting trips:", error);
       alert(`Failed to detect trips: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -429,21 +477,70 @@ export default function TripDetector() {
       </Card>
 
       {detectedTrips.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Detected Trips ({detectedTrips.length})
-              {excludedTrips.size > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {excludedTrips.size} excluded
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Trips automatically detected using ignition signals and GPS data
-            </CardDescription>
-          </CardHeader>
+        <>
+          {/* Odometer Reading Section */}
+          {odometerData && (odometerData.start !== null || odometerData.end !== null) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Odometer Reading
+                </CardTitle>
+                <CardDescription>
+                  Vehicle odometer readings for the selected date range
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {odometerData.start !== null ? `${odometerData.start.toLocaleString()} km` : 'N/A'}
+                    </div>
+                    <div className="text-sm text-blue-500 mt-1">Starting Reading</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(dateRange.from).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">
+                      {odometerData.end !== null ? `${odometerData.end.toLocaleString()} km` : 'N/A'}
+                    </div>
+                    <div className="text-sm text-green-500 mt-1">Ending Reading</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(dateRange.to).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+                {odometerData.start !== null && odometerData.end !== null && (
+                  <div className="mt-4 text-center">
+                    <div className="text-lg font-semibold text-gray-700">
+                      Total Distance: {(odometerData.end - odometerData.start).toLocaleString()} km
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      ({((odometerData.end - odometerData.start) * 0.621371).toFixed(1)} miles)
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Detected Trips Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Detected Trips ({detectedTrips.length})
+                {excludedTrips.size > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {excludedTrips.size} excluded
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                Trips automatically detected using ignition signals and GPS data
+              </CardDescription>
+            </CardHeader>
           <CardContent>
                 <div className="space-y-3">
                   {detectedTrips.map((trip) => (
@@ -610,8 +707,9 @@ export default function TripDetector() {
                     </div>
                   ))}
                 </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Sticky Export Button */}

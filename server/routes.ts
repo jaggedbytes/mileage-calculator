@@ -161,8 +161,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-
-  // Trip management routes for Phase 1 testing
   
   // Import trips from DIMO data for a vehicle
   app.post("/api/trips/import/:vehicleId", async (req, res) => {

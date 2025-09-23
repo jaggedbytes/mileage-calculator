@@ -386,7 +386,7 @@ export class DimoService {
    * Improved location-based trip detection that considers time gaps between data points
    */
   private detectTripsWithTimeGaps(
-    coordinates: Array<{lat: number, lng: number, timestamp: string}>,
+    coordinates: Array<{lat: number, lng: number, timestamp: string, odometer: number | null}>,
     minTripDistance: number = 0.5,
     maxStopDuration: number = 15,
     maxTimeGapMinutes: number = 120
@@ -398,15 +398,15 @@ export class DimoService {
     endLat: number;
     endLng: number;
     distance: number;
-    coordinates: Array<{lat: number, lng: number, timestamp: string}>;
+    coordinates: Array<{lat: number, lng: number, timestamp: string, odometer: number | null}>;
   }> {
     if (coordinates.length < 2) {
       return [];
     }
     
     const trips = [];
-    let currentTripStart: {lat: number, lng: number, timestamp: string} | null = null;
-    let currentTripCoords: Array<{lat: number, lng: number, timestamp: string}> = [];
+    let currentTripStart: {lat: number, lng: number, timestamp: string, odometer: number | null} | null = null;
+    let currentTripCoords: Array<{lat: number, lng: number, timestamp: string, odometer: number | null}> = [];
     let lastMovement = coordinates[0];
     
     for (let i = 1; i < coordinates.length; i++) {
