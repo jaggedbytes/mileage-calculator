@@ -2,7 +2,6 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Car, MapPin, Navigation } from "lucide-react";
 import DimoAuth from "./dimo-auth";
-import ThemeToggle from "./theme-toggle";
 
 export default function AppNavigation() {
   const [location] = useLocation();
@@ -53,9 +52,8 @@ export default function AppNavigation() {
             </nav>
           </div>
 
-          {/* Right side - Auth and Theme */}
+          {/* Right side - Auth */}
           <div className="flex items-center space-x-4">
-            <ThemeToggle />
             <DimoAuth />
           </div>
         </div>
