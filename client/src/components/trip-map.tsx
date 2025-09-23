@@ -83,7 +83,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
     // Track if map is currently active/focused
     let isMapActive = false;
 
-    // Add event listeners for focus/blur
+    // Add event listeners for focus/blur (mouse and touch)
     mapInstanceRef.current.on('click', () => {
       enableZoom();
       isMapActive = true;
@@ -97,8 +97,25 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
       isMapActive = false;
     });
     
-    // Disable zoom when clicking outside the map
+    // Touch events for mobile devices
+    mapInstanceRef.current.on('touchstart', () => {
+      enableZoom();
+      isMapActive = true;
+    });
+    mapInstanceRef.current.on('touchend', () => {
+      // Keep zoom enabled after touch ends (mobile users expect this)
+      // Only disable if they touch outside the map
+    });
+    
+    // Disable zoom when clicking/touching outside the map
     const handleClickOutside = (event: MouseEvent) => {
+      if (mapRef.current && !mapRef.current.contains(event.target as Node)) {
+        disableZoom();
+        isMapActive = false;
+      }
+    };
+    
+    const handleTouchOutside = (event: TouchEvent) => {
       if (mapRef.current && !mapRef.current.contains(event.target as Node)) {
         disableZoom();
         isMapActive = false;
@@ -115,6 +132,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
     };
     
     document.addEventListener('click', handleClickOutside);
+    document.addEventListener('touchstart', handleTouchOutside, { passive: true });
     document.addEventListener('wheel', handleVerticalScroll, { passive: true });
 
     // Create custom markers
@@ -186,6 +204,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
     return () => {
       // Clean up event listeners
       document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleTouchOutside);
       document.removeEventListener('wheel', handleVerticalScroll);
       
       if (mapInstanceRef.current) {
