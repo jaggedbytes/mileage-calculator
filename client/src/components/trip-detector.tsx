@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,6 +99,14 @@ export default function TripDetector() {
     queryFn: () => fetchUserVehicles(walletAddress!),
     enabled: isAuthenticated && !!walletAddress,
   });
+
+  // Auto-expand all maps when trips are detected
+  useEffect(() => {
+    if (detectedTrips.length > 0) {
+      const allTripIds = new Set(detectedTrips.map(trip => trip.id));
+      setExpandedMaps(allTripIds);
+    }
+  }, [detectedTrips]);
 
   const handleDetectTrips = async () => {
     if (!selectedVehicle || !walletAddress) return;

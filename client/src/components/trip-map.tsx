@@ -41,8 +41,15 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
   useEffect(() => {
     if (!mapRef.current || !isExpanded) return;
 
-    // Initialize map
-    mapInstanceRef.current = L.map(mapRef.current).setView(
+    // Initialize map with scroll wheel zoom disabled by default
+    mapInstanceRef.current = L.map(mapRef.current, {
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      boxZoom: false,
+      keyboard: false,
+      dragging: true
+    }).setView(
       [trip.startLatitude, trip.startLongitude],
       13,
     );
@@ -50,6 +57,65 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
     }).addTo(mapInstanceRef.current);
+
+    // Enable zoom when map is clicked/focused
+    const enableZoom = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.scrollWheelZoom.enable();
+        mapInstanceRef.current.doubleClickZoom.enable();
+        mapInstanceRef.current.touchZoom.enable();
+        mapInstanceRef.current.boxZoom.enable();
+        mapInstanceRef.current.keyboard.enable();
+      }
+    };
+
+    // Disable zoom when map loses focus
+    const disableZoom = () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.scrollWheelZoom.disable();
+        mapInstanceRef.current.doubleClickZoom.disable();
+        mapInstanceRef.current.touchZoom.disable();
+        mapInstanceRef.current.boxZoom.disable();
+        mapInstanceRef.current.keyboard.disable();
+      }
+    };
+
+    // Track if map is currently active/focused
+    let isMapActive = false;
+
+    // Add event listeners for focus/blur
+    mapInstanceRef.current.on('click', () => {
+      enableZoom();
+      isMapActive = true;
+    });
+    mapInstanceRef.current.on('mouseenter', () => {
+      enableZoom();
+      isMapActive = true;
+    });
+    mapInstanceRef.current.on('mouseleave', () => {
+      disableZoom();
+      isMapActive = false;
+    });
+    
+    // Disable zoom when clicking outside the map
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mapRef.current && !mapRef.current.contains(event.target as Node)) {
+        disableZoom();
+        isMapActive = false;
+      }
+    };
+    
+    // Disable zoom when vertical scroll is detected (user scrolling the page)
+    const handleVerticalScroll = (event: WheelEvent) => {
+      if (isMapActive && event.deltaY !== 0) {
+        // Vertical scroll detected while map is active - lock the map
+        disableZoom();
+        isMapActive = false;
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('wheel', handleVerticalScroll, { passive: true });
 
     // Create custom markers
     const startIcon = L.divIcon({
@@ -118,6 +184,10 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
     }
 
     return () => {
+      // Clean up event listeners
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('wheel', handleVerticalScroll);
+      
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
