@@ -260,6 +260,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Detect trips using ignition signals for maximum accuracy
+  app.post("/api/trips/detect/:vehicleId", async (req, res) => {
+    try {
+      const { vehicleId } = req.params;
+      const { userId, from, to } = req.body;
+      
+      console.log(`Trip detection request:`, { vehicleId, userId, from, to });
+      
+      if (!userId) {
+        console.log("Missing userId in request");
+        res.status(400).json({ message: "userId is required" });
+        return;
+      }
+
+      // Default to last 7 days if no date range provided
+      const fromDate = from || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const toDate = to || new Date().toISOString();
+
+      console.log(`Detecting trips for vehicle ${vehicleId}, user ${userId}, from ${fromDate} to ${toDate}`);
+      
+      // Detect trips using ignition signals
+      const detectedTrips = await dimoService.detectVehicleTripsFromIgnition(vehicleId, userId, fromDate, toDate);
+      
+      console.log(`Detected ${detectedTrips.length} trips`);
+      
+      // Save trips to storage
+      const savedTrips = await Promise.all(
+        detectedTrips.map(trip => storage.createTrip(trip))
+      );
+      
+      console.log(`Saved ${savedTrips.length} trips to storage`);
+      
+      res.json({
+        message: `Successfully detected ${savedTrips.length} trips using ignition signals`,
+        trips: savedTrips,
+        vehicleId,
+        from: fromDate,
+        to: toDate,
+        detectionMethod: "ignition"
+      });
+    } catch (error) {
+      console.error("Error detecting trips:", error);
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to detect trips"
+      });
+    }
+  });
+
+  // Export mileage data as CSV
+  app.get("/api/mileage/export", async (req, res) => {
+    try {
+      const { userId, month } = req.query; // month in YYYY-MM format
+      
+      if (!userId || !month) {
+        res.status(400).json({ message: "userId and month parameters are required" });
+        return;
+      }
+      
+      // Get all trips for the user
+      const allTrips = await storage.getTripsByUser(userId as string);
+      
+      // Generate monthly summary
+      const summary = generateMileageSummary(allTrips, month as string);
+      
+      // Create CSV content
+      const csvHeader = "Date,Business Miles,Personal Miles,Other Miles,Total Miles\n";
+      const csvRows = Object.entries(summary.dailyBreakdown)
+        .map(([date, data]) => `${date},${data.business},${data.personal},${data.other},${data.total}`)
+        .join('\n');
+      
+      const csvContent = csvHeader + csvRows;
+      
+      // Set headers for CSV download
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="mileage-${month}.csv"`);
+      
+      res.send(csvContent);
+    } catch (error) {
+      console.error("Error exporting mileage data:", error);
+      res.status(500).json({ message: "Failed to export mileage data" });
+    }
+  });
+
   // Update trip classification
   app.patch("/api/trips/:tripId", async (req, res) => {
     try {
