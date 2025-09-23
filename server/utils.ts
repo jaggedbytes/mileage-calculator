@@ -110,14 +110,18 @@ export function detectTrips(
                                      new Date(lastMovement.timestamp).getTime();
         const minutesSinceLastMovement = timeSinceLastMovement / (1000 * 60);
         
+        console.log(`Vehicle stopped for ${minutesSinceLastMovement.toFixed(1)} minutes (threshold: ${maxStopDuration} min)`);
+        
         if (minutesSinceLastMovement >= maxStopDuration) {
           // End the current trip
           const tripDistance = calculateTotalDistance(currentTripCoords);
           
           if (tripDistance >= minTripDistance) {
+            // Calculate actual trip duration based on movement time
+            const actualEndTime = currentTripCoords[currentTripCoords.length - 1].timestamp;
             trips.push({
               startTime: currentTripStart.timestamp,
-              endTime: lastMovement.timestamp,
+              endTime: actualEndTime,
               startLat: currentTripStart.lat,
               startLng: currentTripStart.lng,
               endLat: lastMovement.lat,

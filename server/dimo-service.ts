@@ -198,7 +198,88 @@ export class DimoService {
   }
 
   /**
-   * Fetch detailed historical location data for trip detection
+   * Fetch ignition and location data for accurate trip detection
+   * @param vehicleId DIMO vehicle token ID
+   * @param from Start date in ISO format
+   * @param to End date in ISO format
+   * @param interval Data interval (default: "5m" for 5-minute intervals)
+   * @returns Array of ignition and location data points with timestamps
+   */
+  async getVehicleIgnitionAndLocationData(vehicleId: string, from: string, to: string, interval: string = "5m") {
+    try {
+      console.log(`Getting ignition data for vehicle ${vehicleId} from ${from} to ${to}`);
+      const tokenId = parseInt(vehicleId);
+
+      // Get Developer JWT and Vehicle JWT
+      console.log("Getting developer JWT...");
+      const developerJwt = await this.getDeveloperJwt();
+      console.log("Getting vehicle JWT...");
+      const vehicleJwt = await this.getVehicleJwt(developerJwt, tokenId);
+
+      // Query telemetry API for ignition and location data
+      const query = `
+        {
+          signals(
+            tokenId: ${tokenId},
+            from: "${from}",
+            to: "${to}",
+            interval: "${interval}"
+          ) {
+            timestamp
+            isIgnitionOn (agg: LAST)
+            currentLocationLatitude (agg: LAST)
+            currentLocationLongitude (agg: LAST)
+            speed (agg: MAX)
+            powertrainTransmissionTravelledDistance (agg: LAST)
+            dimoAftermarketHDOP (agg: LAST)
+          }
+        }
+      `;
+
+      console.log(`Fetching ignition and location data for vehicle: ${vehicleId} from ${from} to ${to}`);
+      console.log("Query:", query);
+
+      const historyData = await this.dimo.telemetry.query({
+        ...vehicleJwt,
+        query: query,
+      });
+
+      console.log("Raw DIMO API response:", JSON.stringify(historyData, null, 2));
+
+      const signalsData = historyData?.data?.signals;
+      console.log(`DIMO Ignition/Location API returned ${signalsData?.length || 0} data points`);
+
+      if (!Array.isArray(signalsData) || signalsData.length === 0) {
+        console.log("No signals data available");
+        return [];
+      }
+
+      // Convert to standardized format with explicit parsing
+      const processedData = signalsData
+        .filter(point => point.timestamp) // Only require timestamp, location is optional
+        .map(point => ({
+          timestamp: point.timestamp,
+          isIgnitionOn: point.isIgnitionOn !== null ? parseFloat(point.isIgnitionOn) === 1 : null,
+          lat: point.currentLocationLatitude ? parseFloat(point.currentLocationLatitude) : null,
+          lng: point.currentLocationLongitude ? parseFloat(point.currentLocationLongitude) : null,
+          speed: point.speed ? parseFloat(point.speed) : 0,
+          odometer: point.powertrainTransmissionTravelledDistance ? parseFloat(point.powertrainTransmissionTravelledDistance) : null,
+          hdop: point.dimoAftermarketHDOP ? parseFloat(point.dimoAftermarketHDOP) : 1.0,
+        }));
+
+      console.log(`Processed ${processedData.length} data points`);
+      return processedData;
+
+    } catch (error) {
+      console.error("Error fetching DIMO vehicle ignition and location data:", error);
+      console.error("Error details:", error instanceof Error ? error.message : "Unknown error");
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch detailed historical location data for trip detection (legacy method)
    * @param vehicleId DIMO vehicle token ID
    * @param from Start date in ISO format
    * @param to End date in ISO format
@@ -261,7 +342,265 @@ export class DimoService {
   }
 
   /**
-   * Detect and process trips from vehicle historical data
+   * Detect trips using ignition signals for maximum accuracy
+   * @param vehicleId DIMO vehicle token ID
+   * @param userId User ID for trip ownership
+   * @param from Start date in ISO format
+   * @param to End date in ISO format
+   * @returns Array of detected trips ready for storage
+   */
+  async detectVehicleTripsFromIgnition(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
+    try {
+      console.log(`Starting ignition-based trip detection for vehicle ${vehicleId}`);
+      
+      // Fetch ignition and location data with higher frequency for accuracy
+      const ignitionData = await this.getVehicleIgnitionAndLocationData(vehicleId, from, to, "1m");
+
+      console.log(`Retrieved ${ignitionData.length} ignition data points`);
+
+      if (ignitionData.length < 2) {
+        console.log(`Insufficient ignition data for trip detection: ${ignitionData.length} points`);
+        return [];
+      }
+
+      // Check if we have any ignition data (non-null isIgnitionOn values)
+      const hasIgnitionData = ignitionData.some(point => point.isIgnitionOn !== null);
+      
+      if (!hasIgnitionData) {
+        console.log("No ignition data available, falling back to location-based trip detection");
+        return this.detectVehicleTripsFromLocation(vehicleId, userId, from, to, ignitionData);
+      }
+
+      console.log(`Processing ${ignitionData.length} ignition/location points for trip detection`);
+
+      // Detect trips using ignition signals
+      const detectedTrips = this.detectTripsFromIgnition(ignitionData);
+
+      console.log(`Detected ${detectedTrips.length} trips using ignition signals`);
+
+      // Convert to InsertTrip format
+      const trips: InsertTrip[] = detectedTrips.map(trip => ({
+        userId,
+        vehicleId,
+        startTime: trip.startTime,
+        endTime: trip.endTime,
+        startLatitude: trip.startLat,
+        startLongitude: trip.startLng,
+        endLatitude: trip.endLat,
+        endLongitude: trip.endLng,
+        distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
+        classification: "personal", // Default classification
+        notes: `Auto-detected trip via ignition (${trip.coordinates.length} GPS points)`
+      }));
+
+      console.log(`Converted to ${trips.length} InsertTrip objects`);
+      return trips;
+
+    } catch (error) {
+      console.error("Error detecting vehicle trips from ignition:", error);
+      console.error("Error details:", error instanceof Error ? error.message : "Unknown error");
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      throw error;
+    }
+  }
+
+  /**
+   * Fallback trip detection using location data when ignition data is not available
+   */
+  private async detectVehicleTripsFromLocation(vehicleId: string, userId: string, from: string, to: string, locationData: any[]): Promise<InsertTrip[]> {
+    try {
+      console.log(`Starting location-based trip detection for vehicle ${vehicleId}`);
+      
+      // Filter out points without location data
+      const validLocationData = locationData.filter(point => 
+        point.lat !== null && point.lng !== null && point.timestamp
+      );
+
+      if (validLocationData.length < 2) {
+        console.log(`Insufficient location data for trip detection: ${validLocationData.length} points`);
+        return [];
+      }
+
+      console.log(`Processing ${validLocationData.length} location points for trip detection`);
+
+      // Use the existing location-based trip detection
+      const detectedTrips = detectTrips(validLocationData, 0.5, 15); // 0.5 mile minimum, 15 minute stops
+
+      console.log(`Detected ${detectedTrips.length} trips using location data`);
+
+      // Convert to InsertTrip format
+      const trips: InsertTrip[] = detectedTrips.map(trip => ({
+        userId,
+        vehicleId,
+        startTime: trip.startTime,
+        endTime: trip.endTime,
+        startLatitude: trip.startLat,
+        startLongitude: trip.startLng,
+        endLatitude: trip.endLat,
+        endLongitude: trip.endLng,
+        distance: Math.round(trip.distance * 100) / 100, // Round to 2 decimal places
+        classification: "personal", // Default classification
+        notes: `Auto-detected trip via location (${trip.coordinates.length} GPS points)`
+      }));
+
+      console.log(`Converted to ${trips.length} InsertTrip objects`);
+      return trips;
+
+    } catch (error) {
+      console.error("Error detecting vehicle trips from location:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Detect trips from ignition and location data
+   * @param data Array of ignition and location data points
+   * @returns Array of detected trips
+   */
+  private detectTripsFromIgnition(data: Array<{
+    timestamp: string;
+    isIgnitionOn: boolean | null;
+    lat: number | null;
+    lng: number | null;
+    speed: number;
+    odometer: number | null;
+  }>): Array<{
+    startTime: string;
+    endTime: string;
+    startLat: number;
+    startLng: number;
+    endLat: number;
+    endLng: number;
+    distance: number;
+    coordinates: Array<{lat: number, lng: number, timestamp: string}>;
+  }> {
+    const trips = [];
+    let currentTripStart: {lat: number, lng: number, timestamp: string} | null = null;
+    let currentTripCoords: Array<{lat: number, lng: number, timestamp: string}> = [];
+    let tripStartTime: string | null = null;
+    let lastOdometer: number | null = null;
+
+    for (let i = 0; i < data.length; i++) {
+      const point = data[i];
+      const isIgnitionOn = point.isIgnitionOn === true; // Only true when explicitly true
+      const hasLocation = point.lat !== null && point.lng !== null;
+
+      if (isIgnitionOn && !currentTripStart) {
+        // Trip starts - ignition turned on
+        tripStartTime = point.timestamp;
+        lastOdometer = point.odometer;
+        
+        if (hasLocation) {
+          currentTripStart = {
+            lat: point.lat,
+            lng: point.lng,
+            timestamp: point.timestamp
+          };
+          currentTripCoords = [currentTripStart];
+        }
+      } else if (point.isIgnitionOn === false && currentTripStart && tripStartTime) {
+        // Trip ends - ignition turned off
+        const tripEndTime = point.timestamp;
+        let distance = 0;
+        
+        // Calculate distance using GPS coordinates if available
+        if (currentTripCoords.length >= 2) {
+          distance = this.calculateTotalDistance(currentTripCoords);
+        } else if (point.odometer !== null && lastOdometer !== null) {
+          // Fallback to odometer reading if GPS data is insufficient
+          distance = (point.odometer - lastOdometer) * 0.621371; // Convert km to miles
+        }
+
+        // Only include trips with meaningful distance (at least 0.1 miles)
+        if (distance >= 0.1) {
+          const endCoord = currentTripCoords.length > 0 ? 
+            currentTripCoords[currentTripCoords.length - 1] : 
+            currentTripStart;
+
+          trips.push({
+            startTime: tripStartTime,
+            endTime: tripEndTime,
+            startLat: currentTripStart.lat,
+            startLng: currentTripStart.lng,
+            endLat: endCoord.lat,
+            endLng: endCoord.lng,
+            distance: distance,
+            coordinates: [...currentTripCoords]
+          });
+        }
+
+        // Reset for next trip
+        currentTripStart = null;
+        currentTripCoords = [];
+        tripStartTime = null;
+        lastOdometer = null;
+      } else if (point.isIgnitionOn === true && currentTripStart && hasLocation) {
+        // Trip in progress - add location point
+        currentTripCoords.push({
+          lat: point.lat,
+          lng: point.lng,
+          timestamp: point.timestamp
+        });
+      }
+    }
+
+    return trips;
+  }
+
+  /**
+   * Calculate total distance for an array of GPS coordinates
+   * @param coordinates Array of {lat, lng} coordinates
+   * @returns Total distance in miles
+   */
+  private calculateTotalDistance(coordinates: Array<{lat: number, lng: number}>): number {
+    if (coordinates.length < 2) {
+      return 0;
+    }
+    
+    let totalDistance = 0;
+    for (let i = 1; i < coordinates.length; i++) {
+      const prev = coordinates[i - 1];
+      const curr = coordinates[i];
+      totalDistance += this.calculateDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+    }
+    
+    return totalDistance;
+  }
+
+  /**
+   * Calculate the distance between two GPS coordinates using the Haversine formula
+   * @param lat1 Latitude of first point in degrees
+   * @param lng1 Longitude of first point in degrees  
+   * @param lat2 Latitude of second point in degrees
+   * @param lng2 Longitude of second point in degrees
+   * @returns Distance in miles
+   */
+  private calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 3959; // Earth's radius in miles
+    
+    // Convert latitude and longitude from degrees to radians
+    const lat1Rad = lat1 * (Math.PI / 180);
+    const lng1Rad = lng1 * (Math.PI / 180);
+    const lat2Rad = lat2 * (Math.PI / 180);
+    const lng2Rad = lng2 * (Math.PI / 180);
+    
+    // Differences
+    const dLat = lat2Rad - lat1Rad;
+    const dLng = lng2Rad - lng1Rad;
+    
+    // Haversine formula
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+             Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+             Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+    // Distance in miles
+    return R * c;
+  }
+
+  /**
+   * Detect and process trips from vehicle historical data (legacy method)
    * @param vehicleId DIMO vehicle token ID
    * @param userId User ID for trip ownership
    * @param from Start date in ISO format
@@ -270,6 +609,12 @@ export class DimoService {
    */
   async detectVehicleTrips(vehicleId: string, userId: string, from: string, to: string): Promise<InsertTrip[]> {
     try {
+      // Try ignition-based detection first, fallback to location-based
+      try {
+        return await this.detectVehicleTripsFromIgnition(vehicleId, userId, from, to);
+      } catch (ignitionError) {
+        console.log("Ignition-based trip detection failed, falling back to location-based:", ignitionError);
+        
       // Fetch detailed historical data
       const locationHistory = await this.getVehicleDetailedHistory(vehicleId, from, to, "15m");
 
@@ -301,6 +646,7 @@ export class DimoService {
       }));
 
       return trips;
+      }
 
     } catch (error) {
       console.error("Error detecting vehicle trips:", error);
