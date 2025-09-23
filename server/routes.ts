@@ -441,7 +441,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const endLoc = `${trip.endLatitude.toFixed(4)}, ${trip.endLongitude.toFixed(4)}`;
             const notes = (trip.userNotes || '').replace(/"/g, '""'); // Escape quotes for CSV
             
-            return `${tripDate},${tripTime},${trip.classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}","${notes}"`;
+            const classification = trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1);
+            return `${tripDate},${tripTime},${classification},${trip.distance.toFixed(2)},"${startLoc}","${endLoc}","${notes}"`;
           })
           .join('\n');
         

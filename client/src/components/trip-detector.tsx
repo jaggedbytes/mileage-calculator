@@ -444,7 +444,7 @@ export default function TripDetector() {
                           <Badge 
                             variant={trip.classification === 'business' ? 'default' : trip.classification === 'personal' ? 'secondary' : 'outline'}
                           >
-                            {trip.classification}
+                            {trip.classification.charAt(0).toUpperCase() + trip.classification.slice(1)}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
                             {formatTime(trip.startTime)}
