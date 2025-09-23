@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { Info } from "lucide-react";
-import logoBlack from "@/assets/logo-black.png";
-import logoWhite from "@/assets/logo-white.png";
 import GpsMap from "@/components/gps-map";
 import UserVehicles from "@/components/user-vehicles";
-import { useTheme } from "@/components/theme-provider";
-import GitHubButton from "react-github-btn";
 
 interface GpsData {
   lat: number;
@@ -15,7 +11,6 @@ interface GpsData {
 }
 
 export default function SharedVehicles() {
-  const { theme } = useTheme();
   const [gpsData, setGpsData] = useState<GpsData>({
     lat: 40.7128,
     lng: -74.006,
@@ -52,11 +47,6 @@ export default function SharedVehicles() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-2">
-              <img
-                src={theme === "dark" ? logoWhite : logoBlack}
-                alt="DIMO Logo"
-                className="h-8 w-auto"
-              />
               <span className="text-xl font-bold">My Shared Vehicles</span>
             </div>
           </div>

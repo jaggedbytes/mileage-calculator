@@ -83,7 +83,7 @@ export default function DimoAuth() {
       <div className="flex items-center space-x-3">
         <div className="flex items-center space-x-2 text-sm">
           <User className="text-blue-600" size={16} />
-          <div className="hidden sm:block">
+          <div className="flex flex-col">
             <div
               className="font-medium text-slate-900"
               data-testid="user-email"

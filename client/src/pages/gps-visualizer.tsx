@@ -1,12 +1,7 @@
 import { Info } from "lucide-react";
-import logoBlack from "@/assets/logo-black.png";
-import logoWhite from "@/assets/logo-white.png";
 import TripDetector from "@/components/trip-detector";
-import { useTheme } from "@/components/theme-provider";
-import GitHubButton from "react-github-btn";
 
 export default function TripDetectionPage() {
-  const { theme } = useTheme();
 
   return (
     <div className="min-h-screen bg-background" data-testid="trip-detection">
@@ -15,11 +10,6 @@ export default function TripDetectionPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center space-x-2">
-              <img
-                src={theme === "dark" ? logoWhite : logoBlack}
-                alt="DIMO Logo"
-                className="h-8 w-auto"
-              />
               <span className="text-xl font-bold">Trip Detection</span>
             </div>
           </div>
