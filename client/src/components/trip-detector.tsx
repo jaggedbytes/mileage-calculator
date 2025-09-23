@@ -425,9 +425,12 @@ export default function TripDetector() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Automatic Trip Detection</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Car className="h-5 w-5" />
+            Mileage Calculator
+          </CardTitle>
           <CardDescription>
-            Sign in with DIMO to automatically detect trips using your vehicle's ignition data
+            Connect your vehicle through DIMO to see your trips and mileage reports
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -445,7 +448,7 @@ export default function TripDetector() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Car className="h-5 w-5" />
-            Automatic Trip Detection
+            Mileage Calculator
           </CardTitle>
           <CardDescription>
             Detect trips automatically using your vehicle's ignition signals and GPS data

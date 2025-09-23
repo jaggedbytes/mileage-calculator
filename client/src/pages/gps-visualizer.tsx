@@ -5,17 +5,6 @@ export default function TripDetectionPage() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="trip-detection">
-      {/* Header */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="text-xl font-bold">Trip Detection</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Trip Detection - Full Width */}

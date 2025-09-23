@@ -13,9 +13,9 @@ export default function AppNavigation() {
   const navItems = [
     {
       href: "/",
-      label: "Trip Detection",
+      label: "Mileage Calculator",
       icon: Navigation,
-      description: "Automatic trip detection and mileage tracking"
+      description: "Trip detection and mileage tracking"
     },
     {
       href: "/shared-vehicles",
