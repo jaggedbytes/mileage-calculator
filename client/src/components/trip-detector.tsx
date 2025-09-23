@@ -95,6 +95,7 @@ export default function TripDetector() {
   const [excludedTrips, setExcludedTrips] = useState<Set<string>>(new Set());
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [tripNotes, setTripNotes] = useState<Record<string, string>>({});
+  const [showStickyExport, setShowStickyExport] = useState(false);
 
   // Fetch user vehicles
   const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
@@ -109,6 +110,20 @@ export default function TripDetector() {
       const allTripIds = new Set(detectedTrips.map(trip => trip.id));
       setExpandedMaps(allTripIds);
     }
+  }, [detectedTrips]);
+
+  // Handle sticky export button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      const exportButton = document.getElementById('export-button');
+      if (exportButton) {
+        const rect = exportButton.getBoundingClientRect();
+        setShowStickyExport(rect.bottom < 0);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [detectedTrips]);
 
   const handleDetectTrips = async () => {
@@ -388,6 +403,7 @@ export default function TripDetector() {
             
             {detectedTrips.length > 0 && (
               <Button
+                id="export-button"
                 onClick={handleExportCSV}
                 variant="outline"
                 className="flex items-center gap-2"
@@ -596,6 +612,20 @@ export default function TripDetector() {
                 </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Sticky Export Button */}
+      {showStickyExport && detectedTrips.length > 0 && (
+        <div className="fixed bottom-3 right-3 z-50">
+          <Button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 shadow-lg"
+            size="lg"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -212,7 +212,7 @@ export default function TripMap({ trip, isExpanded, onToggle }: TripMapProps) {
         <div className="mt-2">
           <div
             ref={mapRef}
-            className="w-full h-64 rounded-lg border"
+            className="w-full h-64 rounded-lg border z-40"
             style={{ minHeight: '256px' }}
           />
           <div className="mt-2 text-xs text-muted-foreground text-center">
