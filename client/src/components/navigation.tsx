@@ -29,7 +29,7 @@ export default function AppNavigation() {
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Auth */}
-        <div className="flex h-16 items-center justify-end">
+        <div className="flex h-32 sm:h-16 items-center justify-end">
           <DimoAuth />
         </div>
         <div className="flex h-16 items-center">

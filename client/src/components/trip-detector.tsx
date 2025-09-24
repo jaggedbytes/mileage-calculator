@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check, Edit3, Save, X as XIcon, Clock } from "lucide-react";
+import { Calendar, Car, Download, Play, MapPin, Loader2, X, Check, Edit3, Save, X as XIcon, Clock, RefreshCw } from "lucide-react";
 import { useCachedDimoAuth } from "@/hooks/use-cached-auth";
 import TripMap from "./trip-map";
 
@@ -101,11 +101,13 @@ export default function TripDetector() {
   const [dataInterval, setDataInterval] = useState("1s");
 
   // Fetch user vehicles
-  const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError } = useQuery({
+  const { data: vehiclesData, isLoading: vehiclesLoading, error: vehiclesError, refetch: refetchVehicles } = useQuery({
     queryKey: ["/api/dimo/vehicles", walletAddress],
-    queryFn: () => fetchUserVehicles(walletAddress!),
+        queryFn: () => fetchUserVehicles(walletAddress!),
     enabled: isAuthenticated && !!walletAddress,
   });
+
+  // Debug auth state changes
 
   // Auto-expand all maps when trips are detected
   useEffect(() => {
@@ -480,6 +482,22 @@ export default function TripDetector() {
               {vehiclesError && (
                 <div className="text-sm text-red-600 mt-1">
                   Failed to load vehicles: {vehiclesError.message}
+                </div>
+              )}
+              {isAuthenticated && !vehiclesLoading && (!vehiclesData?.vehicles || vehiclesData.vehicles.length === 0) && (
+                <div className="mt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => window.location.reload()}
+                    className="text-xs"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Refresh
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No vehicles found. Click to "refresh" after sharing vehicles.
+                  </p>
                 </div>
               )}
             </div>
